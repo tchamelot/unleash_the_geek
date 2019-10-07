@@ -1,5 +1,5 @@
 import sys
-
+import numpy as np
 
 class Entity:
     """
@@ -69,26 +69,28 @@ def main():
 
     # Get map dimensions
     width, height = [int(i) for i in input().split()]
-    map = [[('?', '0')] * width] * height
+    ore = np.zeros((height, width), dtype=np.int8)
+    hole = np.zeros((height, width), dtype=np.bool)
     entities = dict()
+    entity_count, radar_cd, trap_cd = 0, 0, 0
     allies = set()
-    ores = []
 
     while True:
         # Get the score
-        scores = [int(i) for i in input().split()]
+        myScore, enemyScore = [int(i) for i in input().split()]
 
         # Get the map
         for i in range(height):
-            inputs = input().split()
-            for j in range(width):
-                state = (inputs[2*j], inputs[2*j+1])
-                if state[0] not in ['?', '0']:
-                    ores.append((j, i))
-                map[i][j] = state
+            row = np.vectorize(np.uint8)\
+                (
+                    input().replace('?', '-1')  # replace ? in the string
+                        .split()  # convert to to array
+                )  # convert this to int
+            ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
+            hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
 
         # Get entity
-        entity_count, radar_cd, trap_cd = [int(i) for i in input().split()]
+        entity_count, radar_cd, trap_cd = np.vectorize(np.uint8)(input().split())
         for i in range(entity_count):
             id, type, x, y, item = [int(j) for j in input().split()]
             try:
