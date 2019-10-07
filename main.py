@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+from enum import IntEnum
 
 
 class Entity:
@@ -34,16 +35,46 @@ class Robot(Entity):
     """
     Entity that will seek for amadeusium
     """
+    class Task(IntEnum):
+        AVAILABLE = 0
+        PLACE_RADAR = 1
+        RADAR = 2
 
     def __init__(self, x, y, item):
         super().__init__(x, y, item)
         self.action = 'WAIT'
+        self.task = Robot.Task.AVAILABLE
 
     def update(self, x, y, item):
         super().update(x, y, item)
 
+    def radar(self):
+        if self.task == Robot.Task.RADAR:
+            self.action = 'REQUEST RADAR'
+            if self.item == 2:
+                self.task = Robot.Task.PLACE_RADAR
+        if self.task == Robot.Task.PLACE_RADAR:
+            self.action = 'DIG %s %s' % self.target
+            if self.item != 2:
+                self.task = Robot.Task.AVAILABLE
+                self.action = 'WAIT'
+
+        self.action += ' RADAR'
+
     def play(self):
+        """
+        Output the robot action for the current round
+        """
+        if self.task == Robot.Task.AVAILABLE:
+            self.action = 'WAIT'
+        elif self.task <= Robot.Task.RADAR:
+            self.radar()
+
         print(self.action)
+
+    def get_task(self, task, target):
+        self.task = task
+        self.target = target
 
 
 class Radar(Entity):
@@ -87,6 +118,8 @@ class Environment:
         self.trap_cd = 0
         self.allies = set()
         self.enemies = set()
+        self.radar = Radar(5, 5, -1)
+        self.radar_busy = False
 
     def parse(self):
         # Get the score
@@ -129,8 +162,25 @@ def main():
 
         env.parse()
 
+        # Create tasks
+        tasks = []
+        if env.radar_cd == 0 and not env.radar_busy:
+            env.radar_busy = True
+            tasks.append((Robot.Task.RADAR, (env.radar.x, env.radar.y)))
+            env.radar.x = (env.radar.x + 4) % env.width
+            env.radar.y = (env.radar.y + 4) % env.height
+        elif env.radar_cd != 0:
+            env.radar_busy = False
+
+        # Give task
         for ally in env.allies:
             unit = env.entities[ally]
+            if unit.task == Robot.Task.AVAILABLE:
+                try:
+                    # Decompose tuple in multiple args
+                    unit.get_task(*tasks.pop())
+                except IndexError:
+                    pass
             unit.play()
 
 
