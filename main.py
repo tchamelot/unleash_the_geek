@@ -159,34 +159,46 @@ class Environment:
         return len(self.ore[self.ore >= 0])
 
 
-def main():
+class Supervizor:
+    def __init__(self):
+        self.tasks = []
+        pass
 
-    env = Environment()
+    def create_task(self, env):
+        self.tasks = []
 
-    while True:
-
-        env.parse()
-
-        # Create tasks
-        tasks = []
+        # Handle Radar
         if env.radar_cd == 0 and not env.radar_busy:
             env.radar_busy = True
-            tasks.append((Robot.Task.RADAR, (env.radar.x, env.radar.y)))
+            self.tasks.append((Robot.Task.RADAR, (env.radar.x, env.radar.y)))
             env.radar.x = (env.radar.x + 4) % env.width
             env.radar.y = (env.radar.y + 4) % env.height
         elif env.radar_cd != 0:
             env.radar_busy = False
 
-        # Give task
+    def assign_tasks(self, env):
         for ally in env.allies:
             unit = env.entities[ally]
             if unit.task == Robot.Task.AVAILABLE:
                 try:
                     # Decompose tuple in multiple args
-                    unit.get_task(*tasks.pop())
+                    unit.get_task(*self.tasks.pop())
                 except IndexError:
                     pass
             unit.play()
+
+
+def main():
+
+    env = Environment()
+    supervizor = Supervizor()
+
+    while True:
+
+        env.parse()
+
+        supervizor.create_task(env)
+        supervizor.assign_tasks(env)
 
 
 if __name__ == '__main__':
