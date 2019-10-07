@@ -39,6 +39,7 @@ class Robot(Entity):
         AVAILABLE = 0
         PLACE_RADAR = 1
         RADAR = 2
+        DEAD = 3
 
     def __init__(self, x, y, item):
         super().__init__(x, y, item)
@@ -47,6 +48,8 @@ class Robot(Entity):
 
     def update(self, x, y, item):
         super().update(x, y, item)
+        if (x < 0) or (y < 0):
+            self.task = Robot.Task.DEAD
 
     def radar(self):
         if self.task == Robot.Task.RADAR:
@@ -69,6 +72,8 @@ class Robot(Entity):
             self.action = 'WAIT'
         elif self.task <= Robot.Task.RADAR:
             self.radar()
+        if self.task == Robot.Task.DEAD:
+            self.action = 'WAIT DEAD'
 
         print(self.action)
 
