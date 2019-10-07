@@ -22,6 +22,12 @@ class Entity:
         self.y = y
         self.item = item
 
+    def get_loc(self):
+        return self.x, self.y
+
+    def dist_with(self, x, y):
+        return abs(self.x-x) + abs(self.y-y)
+
 
 class Robot(Entity):
     """
@@ -65,45 +71,64 @@ entity_factory = {
     }
 
 
-def main():
+class Environment:
 
-    # Get map dimensions
-    width, height = [int(i) for i in input().split()]
-    ore = np.zeros((height, width), dtype=np.int8)
-    hole = np.zeros((height, width), dtype=np.bool)
-    entities = dict()
-    entity_count, radar_cd, trap_cd = 0, 0, 0
-    allies = set()
+    def __init__(self):
+        # Get map dimensions
+        self.width, self.height = [int(i) for i in input().split()]
+        self.my_score = 0
+        self.enemy_score = 0
+        self.ore = np.zeros((self.height, self.width), dtype=np.int8)
+        self.hole = np.zeros((self.height, self.width), dtype=np.bool)
+        self.entities = dict()
+        self.entity_count = 0
+        self.radar_cd = 0
+        self.trap_cd = 0
+        self.allies = set()
+        self.enemies = set()
 
-    while True:
+    def parse(self):
         # Get the score
-        myScore, enemyScore = [int(i) for i in input().split()]
-
+        self.my_score, self.enemy_score = [int(i) for i in input().split()]
         # Get the map
-        for i in range(height):
+        for i in range(self.height):
             row = np.vectorize(np.uint8)\
                 (
                     input().replace('?', '-1')  # replace ? in the string
                         .split()  # convert to to array
                 )  # convert this to int
-            ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
-            hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
-
-        # Get entity
-        entity_count, radar_cd, trap_cd = np.vectorize(np.uint8)(input().split())
-        for i in range(entity_count):
+            self.ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
+            self.hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
+        # Get entities
+        self.entity_count, self.radar_cd, self.trap_cd = np.vectorize(np.uint8)(input().split())
+        for i in range(self.entity_count):
             id, type, x, y, item = [int(j) for j in input().split()]
             try:
-                entities[id].update(x, y, item)
+                self.entities[id].update(x, y, item)
             except KeyError:
-                entities[id] = entity_factory[type](x, y, item)
+                self.entities[id] = entity_factory[type](x, y, item)
             if type == 0:
-                allies.add(id)
+                self.allies.add(id)
+            if type == 1:
+                self.enemies.add(id)
 
-        # AI here
+    def ore_count(self):
+        return self.ore[self.ore > 0].sum()
 
-        for ally in allies:
-            unit = entities[ally]
+    def surface_coverd_by_radar(self):
+        return len(self.ore[self.ore >= 0])
+
+
+def main():
+
+    env = Environment()
+
+    while True:
+
+        env.parse()
+
+        for ally in env.allies:
+            unit = env.entities[ally]
             unit.play()
 
 
