@@ -73,6 +73,8 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s %s' % self.target
+            if (self.item == 3) and (self.dist_with(*self.target)<3):
+                env.ally_traps[self.target[1], self.target[0]] = True
             if self.item == 4:
                 self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
