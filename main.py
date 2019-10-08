@@ -39,7 +39,9 @@ class Robot(Entity):
         AVAILABLE = 0
         PLACE_RADAR = 1
         RADAR = 2
-        DEAD = 3
+        BASE = 3
+        ORE = 4
+        DEAD = 100
 
     def __init__(self, x, y, item):
         super().__init__(x, y, item)
@@ -65,6 +67,19 @@ class Robot(Entity):
 
         self.action += ' RADAR'
 
+    def ore(self):
+        if self.task == Robot.Task.ORE:
+            self.action = 'DIG %s %s' % self.target
+            if self.item == 4:
+                self.task = Robot.Task.BASE
+        if self.task == Robot.Task.BASE:
+            self.action = 'MOVE 0 %s' % self.y
+            if self.item != 4:
+                self.task = Robot.Task.AVAILABLE
+                self.action = 'WAIT'
+
+        self.action += ' ORE'
+
     def play(self):
         """
         Output the robot action for the current round
@@ -73,7 +88,9 @@ class Robot(Entity):
             self.action = 'WAIT'
         elif self.task <= Robot.Task.RADAR:
             self.radar()
-        if self.task == Robot.Task.DEAD:
+        elif self.task <= Robot.Task.ORE:
+            self.ore()
+        elif self.task == Robot.Task.DEAD:
             self.action = 'WAIT DEAD'
 
         print(self.action)
@@ -157,7 +174,6 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.tasks = []
-        pass
 
     def create_task(self, env):
         self.tasks = []
@@ -170,6 +186,15 @@ class Supervizor:
             env.radar.y = (env.radar.y + 4) % env.height
         elif env.radar_cd != 0:
             env.radar_busy = False
+
+        # Handle ore
+        for i, column in enumerate(env.ore.T):
+            for j, ore in enumerate(column):
+                self.tasks.extend(
+                    [(Robot.Task.ORE, (j, i))] * ore
+                )
+
+        print(self.tasks, file=sys.stderr)
 
     def assign_tasks(self, env):
         for ally in env.allies:
