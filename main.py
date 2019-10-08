@@ -135,6 +135,7 @@ class Environment:
         self.trap_cd = 0
         self.allies = set()
         self.enemies = set()
+        self.radars = set()
         self.radar = Radar(5, 5, -1)
         self.radar_busy = False
 
@@ -163,6 +164,8 @@ class Environment:
                 self.allies.add(u_id)
             if unit_type == 1:
                 self.enemies.add(u_id)
+            if unit_type == 2:
+                self.radars.add(u_id)
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
@@ -174,25 +177,29 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.tasks = []
+        self.desired_radar_poses = {(24, 12), (24, 4), (22, 8), (18, 4), (18, 12), (14, 8), (9, 4), (9, 12), (5, 8)}
 
     def create_task(self, env):
         self.tasks = []
-
         # Handle Radar
-        if env.radar_cd == 0 and not env.radar_busy:
-            env.radar_busy = True
-            self.tasks.append((Robot.Task.RADAR, (env.radar.x, env.radar.y)))
-            env.radar.x = (env.radar.x + 4) % env.width
-            env.radar.y = (env.radar.y + 4) % env.height
-        elif env.radar_cd != 0:
-            env.radar_busy = False
+        actual_radar_pose = {
+            env.entities[id_radar].get_loc()
+            for id_radar in env.radars
+        }
+        remaining_radar_poses = (self.desired_radar_poses - actual_radar_pose)
+        if (env.radar_cd == 0) and len(remaining_radar_poses) != 0:
+            pose = remaining_radar_poses.pop()
+            # for pose in (self.desired_radar_poses - actual_radar_pose):
+            self.tasks.append((Robot.Task.RADAR, pose))
+            env.radar_cd = 5
 
         # Handle ore
         for i, column in enumerate(env.ore.T):
             for j, ore in enumerate(column):
-                self.tasks.extend(
-                    [(Robot.Task.ORE, (j, i))] * ore
-                )
+                if ore > 0:
+                    self.tasks.extend(
+                        [(Robot.Task.ORE, (i, j))] * ore
+                    )
 
         print(self.tasks, file=sys.stderr)
 
