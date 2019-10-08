@@ -81,12 +81,15 @@ class Robot(Entity):
 
         self.action += ' ORE'
 
-    def play(self):
+    def play(self, env):
         """
         Output the robot action for the current round
         """
         if self.task == Robot.Task.AVAILABLE:
-            self.action = 'WAIT'
+            if (self.x == 0) and (env.radar_cd == 0):
+                self.action = "REQUEST TRAP"
+            else:
+                self.action = 'WAIT'
         elif self.task <= Robot.Task.RADAR:
             self.radar()
         elif self.task <= Robot.Task.ORE:
@@ -137,8 +140,7 @@ class Environment:
         self.allies = set()
         self.enemies = set()
         self.radars = set()
-        self.radar = Radar(5, 5, -1)
-        self.radar_busy = False
+        self.traps = set()
 
     def parse(self):
         # Get the score
@@ -167,6 +169,9 @@ class Environment:
                 self.enemies.add(u_id)
             if unit_type == 2:
                 self.radars.add(u_id)
+            if unit_type == 3:
+                self.traps.add(u_id)
+                self.ore[y, x] = -1
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
@@ -210,16 +215,16 @@ class Supervizor:
     def assign_tasks(self, env):
         for ally in env.allies:
             unit = env.entities[ally]
-            sorted(self.tasks, key=lambda t: unit.dist_with(*t[1]))
-            if (unit.task == Robot.Task.AVAILABLE) \
-                    or (unit.task == Robot.Task.ORE) \
-                    or (unit.task == Robot.Task.PLACE_RADAR):
+            sorted(self.tasks,
+                   key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
+                   else t[1][0])
+            if (unit.task != Robot.Task.DEAD):
                 try:
                     # Decompose tuple in multiple args
                     unit.get_task(*self.tasks.pop())
                 except IndexError:
                     pass
-            unit.play()
+            unit.play(env)
 
 
 def main():
