@@ -31,6 +31,8 @@ class Entity:
     def dist_with(self, x, y):
         return abs(self.x-x) + abs(self.y-y)
 
+def dist(t1, t2):
+        return abs(t1[0]-t2[0]) + abs(t1[1]-t2[0])
 
 class Robot(Entity):
     """
@@ -55,9 +57,9 @@ class Robot(Entity):
         if (x < 0) or (y < 0):
             self.task = Robot.Task.DEAD
 
-    def radar(self):
+    def radar(self, env):
         if self.task == Robot.Task.RADAR:
-            self.action = 'REQUEST RADAR'
+            self.action = 'REQUEST RADAR REQRAD'
             if self.item == 2:
                 self.task = Robot.Task.PLACE_RADAR
         if self.task == Robot.Task.PLACE_RADAR:
@@ -68,13 +70,15 @@ class Robot(Entity):
 
         self.action += ' RADAR'
 
-    def ore(self):
+    def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s %s' % self.target
             if self.item == 4:
                 self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s' % self.y
+            if self.dist_with(*self.target) <= 1:
+                env.ally_hole[self.target[1], self.target[0]] = True
             if self.item != 4:
                 self.task = Robot.Task.AVAILABLE
                 self.action = 'WAIT'
@@ -87,13 +91,14 @@ class Robot(Entity):
         """
         if self.task == Robot.Task.AVAILABLE:
             if (self.x == 0) and (env.radar_cd == 0):
-                self.action = "REQUEST TRAP"
+                self.action = "REQUEST TRAP REQTRAP"
+                env.radar_cd = 5
             else:
-                self.action = 'WAIT'
+                self.action = 'WAIT WAIT'
         elif self.task <= Robot.Task.RADAR:
-            self.radar()
+            self.radar(env)
         elif self.task <= Robot.Task.ORE:
-            self.ore()
+            self.ore(env)
         elif self.task == Robot.Task.DEAD:
             self.action = 'WAIT DEAD'
 
@@ -133,6 +138,8 @@ class Environment:
         self.enemy_score = 0
         self.ore = np.zeros((self.height, self.width), dtype=np.int8)
         self.hole = np.zeros((self.height, self.width), dtype=np.bool)
+        self.ally_hole = np.zeros((self.height, self.width), dtype=np.bool)
+        self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
         self.entities = dict()
         self.entity_cnt = 0
         self.radar_cd = 0
@@ -171,10 +178,15 @@ class Environment:
                 self.radars.add(u_id)
             if unit_type == 3:
                 self.traps.add(u_id)
-                self.ore[y, x] = -1
+                self.ally_traps[y, x] = -1
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
+
+    def available_ore_count(self):
+        # when ally_hole or ally_trap is true oe don't count in the sum
+        # the * -1 act as a not()
+        return np.multiply(np.multiply(self.ore, self.ally_hole * -1), self.ally_traps * -1).sum()
 
     def surface_coverd_by_radar(self):
         return len(self.ore[self.ore >= 0])
@@ -198,7 +210,7 @@ class Supervizor:
         remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
         remaining_radar_poses.sort(reverse=True)
         try:
-            if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.ore_count() < 6):
+            if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.available_ore_count() < 10):
                 pose = remaining_radar_poses.pop()
                 self.tasks.append((Robot.Task.RADAR, pose))
         except IndexError:
@@ -207,10 +219,14 @@ class Supervizor:
         # Handle ore
         for i, column in enumerate(env.ore.T):
             for j, ore in enumerate(column):
-                if ore > 0:
+                if ore > 0 and \
+                        (not env.hole[j, i] or env.ally_hole[j, i]) and \
+                        (not env.ally_traps[j, i]):
                     self.tasks.extendleft(
                         [(Robot.Task.ORE, (i, j))] * ore
                     )
+
+        print(self.tasks, file=sys.stderr)
 
     def assign_tasks(self, env):
         for ally in env.allies:
