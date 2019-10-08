@@ -1,6 +1,6 @@
 import sys
-import numpy as np
 from enum import IntEnum
+import numpy as np
 
 
 class Entity:
@@ -45,6 +45,7 @@ class Robot(Entity):
         super().__init__(x, y, item)
         self.action = 'WAIT'
         self.task = Robot.Task.AVAILABLE
+        self.target = (0, 0)
 
     def update(self, x, y, item):
         super().update(x, y, item)
@@ -87,20 +88,14 @@ class Radar(Entity):
     Entity that shows ore lodesa nd enemy traps
     """
 
-    def __init__(self, x, y, item):
-        super().__init__(x, y, item)
-
 
 class Trap(Entity):
     """
     Entity that shows ore lodesa nd enemy traps
     """
 
-    def __init__(self, x, y, item):
-        super().__init__(x, y, item)
 
-
-entity_factory = {
+ENTITY_FACTORY = {
     0: Robot,
     1: Robot,
     2: Radar,
@@ -132,8 +127,8 @@ class Environment:
         # Get the map
         for i in range(self.height):
             row = np.vectorize(np.uint8)(
-                    input().replace('?', '-1')  # replace ? in the string
-                        .split()  # convert to to array
+                input().replace('?', '-1')  # replace ? in the string
+                .split()  # convert to to array
                 )  # convert this to int
             self.ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
             self.hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
@@ -142,15 +137,15 @@ class Environment:
             input().split()
             )
         for i in range(self.entity_cnt):
-            id, type, x, y, item = [int(j) for j in input().split()]
+            u_id, unit_type, x, y, item = [int(j) for j in input().split()]
             try:
-                self.entities[id].update(x, y, item)
+                self.entities[u_id].update(x, y, item)
             except KeyError:
-                self.entities[id] = entity_factory[type](x, y, item)
-            if type == 0:
-                self.allies.add(id)
-            if type == 1:
-                self.enemies.add(id)
+                self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item)
+            if unit_type == 0:
+                self.allies.add(u_id)
+            if unit_type == 1:
+                self.enemies.add(u_id)
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
