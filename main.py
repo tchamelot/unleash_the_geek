@@ -177,11 +177,11 @@ class Environment:
 
 class Supervizor:
     def __init__(self):
-        self.tasks = []
+        self.tasks = deque()
         self.desired_radar_poses = {(24, 12), (24, 4), (22, 8), (18, 4), (18, 12), (14, 8), (9, 4), (9, 12), (5, 8)}
 
     def create_task(self, env):
-        self.tasks = []
+        self.tasks = deque()
         # Handle Radar
         actual_radar_pose = {
             env.entities[id_radar].get_loc()
@@ -198,7 +198,7 @@ class Supervizor:
         for i, column in enumerate(env.ore.T):
             for j, ore in enumerate(column):
                 if ore > 0:
-                    self.tasks.extend(
+                    self.tasks.extendleft(
                         [(Robot.Task.ORE, (i, j))] * ore
                     )
 
