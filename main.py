@@ -233,9 +233,10 @@ class Supervizor:
     def assign_tasks(self, env):
         for ally in env.allies:
             unit = env.entities[ally]
-            sorted(self.tasks,
-                   key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
-                   else t[1][0])
+            # # + 2* dist(...) is allow to prioritize the task that the robot already have
+            # self.tasks = sorted(self.tasks,
+            #        key=lambda t: unit.dist_with(*t[1]) + 2 * dist(unit.target, t[1]) if (t[0] == Robot.Task.ORE)
+            #        else t[1][0])
             if (unit.task != Robot.Task.DEAD):
                 try:
                     # Decompose tuple in multiple args
