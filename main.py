@@ -1,5 +1,6 @@
 import sys
 from enum import IntEnum
+from collections import deque
 import numpy as np
 
 
@@ -206,7 +207,7 @@ class Supervizor:
     def assign_tasks(self, env):
         for ally in env.allies:
             unit = env.entities[ally]
-            if unit.task == Robot.Task.AVAILABLE:
+            if unit.task != Robot.Task.DEAD:
                 try:
                     # Decompose tuple in multiple args
                     unit.get_task(*self.tasks.pop())
