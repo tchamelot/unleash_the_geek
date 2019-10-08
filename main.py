@@ -207,7 +207,7 @@ class Supervizor:
     def assign_tasks(self, env):
         for ally in env.allies:
             unit = env.entities[ally]
-            if unit.task != Robot.Task.DEAD:
+            if (unit.task != Robot.Task.AVAILABLE) or (unit.task != Robot.Task.ORE):
                 try:
                     # Decompose tuple in multiple args
                     unit.get_task(*self.tasks.pop())
