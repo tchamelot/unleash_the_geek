@@ -192,7 +192,7 @@ class Supervizor:
         }
         remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
         remaining_radar_poses.sort(reverse=True)
-        if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.ore_count() < 4):
+        if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.ore_count() < 6):
             pose = remaining_radar_poses.pop()
             # for pose in (self.desired_radar_poses - actual_radar_pose):
             self.tasks.append((Robot.Task.RADAR, pose))
@@ -211,7 +211,9 @@ class Supervizor:
         for ally in env.allies:
             unit = env.entities[ally]
             sorted(self.tasks, key=lambda t: unit.dist_with(*t[1]))
-            if unit.task != Robot.Task.DEAD:
+            if (unit.task == Robot.Task.AVAILABLE) \
+                    or (unit.task == Robot.Task.ORE) \
+                    or (unit.task == Robot.Task.PLACE_RADAR):
                 try:
                     # Decompose tuple in multiple args
                     unit.get_task(*self.tasks.pop())
