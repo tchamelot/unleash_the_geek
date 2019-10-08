@@ -178,7 +178,10 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.tasks = deque()
-        self.desired_radar_poses = {(24, 12), (24, 4), (22, 8), (18, 4), (18, 12), (14, 8), (9, 4), (9, 12), (5, 8)}
+        self.desired_radar_poses = {
+            (24, 12), (24, 4), (22, 8),
+            (18, 4), (18, 12), (14, 8),
+            (9, 4), (9, 12), (5, 8)}
 
     def create_task(self, env):
         self.tasks = deque()
@@ -187,12 +190,12 @@ class Supervizor:
             env.entities[id_radar].get_loc()
             for id_radar in env.radars
         }
-        remaining_radar_poses = (self.desired_radar_poses - actual_radar_pose)
-        if (env.radar_cd == 0) and len(remaining_radar_poses) != 0:
+        remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
+        remaining_radar_poses.sort(reverse=True)
+        if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.ore_count() < 4):
             pose = remaining_radar_poses.pop()
             # for pose in (self.desired_radar_poses - actual_radar_pose):
             self.tasks.append((Robot.Task.RADAR, pose))
-            env.radar_cd = 5
 
         # Handle ore
         for i, column in enumerate(env.ore.T):
@@ -207,7 +210,7 @@ class Supervizor:
     def assign_tasks(self, env):
         for ally in env.allies:
             unit = env.entities[ally]
-            if (unit.task != Robot.Task.AVAILABLE) or (unit.task != Robot.Task.ORE):
+            if (unit.task == Robot.Task.AVAILABLE) or (unit.task == Robot.Task.ORE):
                 try:
                     # Decompose tuple in multiple args
                     unit.get_task(*self.tasks.pop())
