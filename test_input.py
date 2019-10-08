@@ -1,6 +1,8 @@
 import subprocess
+import os
 
-TARGET = ['python3', 'main.py']
+TOPDIR = os.path.dirname(os.path.abspath(__file__))
+TARGET = ['python3', TOPDIR + '/main.py']
 
 
 def test_first_round():

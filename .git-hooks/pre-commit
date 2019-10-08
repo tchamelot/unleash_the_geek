@@ -1,0 +1,40 @@
+#!/usr/bin/python3
+import os
+import sys
+import pytest
+from pylint import epylint as lint
+
+
+TOPDIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TARGET = TOPDIR + '/main.py'
+TEST = [TOPDIR + '/test_input.py']
+
+LINTER_OPT = ' --rcfile=' + TOPDIR + '/.git-hooks/pylintrc'
+TEST_OPT = ['-q']
+
+
+def main():
+    error = 0
+    try:
+        # check linter is ok
+        out, err = lint.py_run(TARGET + LINTER_OPT, return_std=True)
+        for line in out:
+            if 'error' in line:
+                error += 1
+                print(line)
+            elif 'warning' in line:
+                print(line)
+            elif 'rated' in line:
+                print(line)
+
+        assert(error == 0)
+
+        # check test
+        print('Test summary')
+        assert(pytest.main(TEST + TEST_OPT) == 0)
+    except AssertionError:
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
