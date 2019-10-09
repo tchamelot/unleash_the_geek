@@ -145,7 +145,6 @@ class Environment:
         self.ally_hole = np.zeros((self.height, self.width), dtype=np.bool)
         self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
         self.entities = dict()
-        self.entity_cnt = 0
         self.radar_cd = 0
         self.trap_cd = 0
         self.allies = set()
@@ -164,24 +163,23 @@ class Environment:
             self.ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
             self.hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
         # Get entities
-        self.entity_cnt, self.radar_cd, self.trap_cd = np.vectorize(np.uint8)(
+        entity_cnt, self.radar_cd, self.trap_cd = np.vectorize(np.uint8)(
             input().split()
         )
-        for i in range(self.entity_cnt):
+        for i in range(entity_cnt):
             u_id, unit_type, x, y, item = [int(j) for j in input().split()]
             try:
                 self.entities[u_id].update(x, y, item)
             except KeyError:
                 self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item)
-            if unit_type == 0:
-                self.allies.add(u_id)
-            if unit_type == 1:
-                self.enemies.add(u_id)
-            if unit_type == 2:
-                self.radars.add(u_id)
-            if unit_type == 3:
-                self.traps.add(u_id)
-                self.ally_traps[y, x] = True
+                if unit_type == 0:
+                    self.allies.add(u_id)
+                elif unit_type == 1:
+                    self.enemies.add(u_id)
+                elif unit_type == 2:
+                    self.radars.add(u_id)
+                elif unit_type == 3:
+                    self.ally_traps[y, x] = True
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
