@@ -27,8 +27,10 @@ def test_first_round():
     child.stdin.write(input)
     child.stdin.flush()
     out = child.stdout.readline()
-    assert(out == b'REQUEST RADAR RADAR\n')
+    print(out)
+    assert(out == b'REQUEST RADAR REQ_RADAR\n')
     out = child.stdout.readline()
-    assert(out == b'WAIT\n')
+    print(out)
+    assert(out == b'REQUEST TRAP REQ_TRAP\n')
 
     child.kill()
