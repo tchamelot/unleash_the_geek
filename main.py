@@ -237,28 +237,37 @@ class Supervizor:
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in self.feasible_tasks]), file=sys.stderr)
 
     def assign_tasks(self, env):
-        token_tasks = set([env.entities[x].get_task() for x in env.allies])
-        print("*****token************", file=sys.stderr)
-        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in token_tasks]), file=sys.stderr)
-        dispatachable_tasks = self.feasible_tasks - token_tasks
+        taken_tasks = set([env.entities[x].get_task() for x in env.allies])
+
+        print("*****taken************", file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in taken_tasks]), file=sys.stderr)
+
+        dispatchable_tasks = self.feasible_tasks - taken_tasks
+
         print("*****dispatch************", file=sys.stderr)
-        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in dispatachable_tasks]), file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in dispatchable_tasks]), file=sys.stderr)
+
         for ally in env.allies:
             unit = env.entities[ally]
-            dispatachable_tasks = sorted(list(dispatachable_tasks),
-                                         key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
-                                         else unit.x + abs(unit.y - t[1][1]), reverse=True)
+
+            dispatchable_tasks = sorted(
+                list(dispatchable_tasks),
+                key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
+                else unit.x + abs(unit.y - t[1][1]), reverse=True
+            )
+
             if (unit.task != Robot.Task.DEAD) and \
-                    (not (unit.get_task() in self.feasible_tasks)) and \
-                    (unit.get_task()[0] != Robot.Task.RADAR):
+               (not (unit.get_task() in self.feasible_tasks)) and \
+               (unit.get_task()[0] != Robot.Task.RADAR):
                 try:
-                    t = dispatachable_tasks.pop()
+                    t = dispatchable_tasks.pop()
                     print("%s\ntask change: %s:%s => %s:%s" % (
-                    unit, unit.get_task()[0].name, unit.get_task()[1], t[0].name, t[1]), file=sys.stderr)
+                            unit, unit.get_task()[0].name, unit.get_task()[1],
+                            t[0].name, t[1]
+                        ),
+                        file=sys.stderr)
                     # Decompose tuple in multiple args
-                except IndexError:
-                    t = (Robot.Task.AVAILABLE, (0, 0))
-                except KeyError:
+                except LookupError:
                     t = (Robot.Task.AVAILABLE, (0, 0))
                 unit.set_task(*t)
             unit.play(env)
