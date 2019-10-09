@@ -208,12 +208,10 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.feasible_tasks = set()
-        self.one_shot_tasks = set()
-        self.desired_radar_poses = [
+        self.desired_radar_poses = {
             (24, 12), (24, 4), (22, 8),
             (18, 4), (18, 12), (14, 8),
-            (9, 4), (9, 12), (5, 8)]
-        self.desired_radar_poses.sort(reverse=True)
+            (9, 4), (9, 12), (5, 8)}
         self.assigned_tasks = dict()
 
     def create_task(self, env):
@@ -223,15 +221,14 @@ class Supervizor:
             env.entities[id_radar].get_loc()
             for id_radar in env.radars
         }
-        # remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
-        # remaining_radar_poses.sort(reverse=True)
+        remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
+        remaining_radar_poses.sort(reverse=True)
         try:
             if (env.radar_cd == 0) \
-                and (len(self.one_shot_tasks) == 0) \
-                and (len(self.desired_radar_poses) != 0) \
-                and (env.available_ore_count() < 2):
-                pose = self.desired_radar_poses.pop()
-                self.one_shot_tasks.add((Robot.Task.RADAR, pose))
+                and (len(remaining_radar_poses) > 0) \
+                and (env.available_ore_count() < 1):
+                pose = remaining_radar_poses.pop()
+                self.feasible_tasks.add((Robot.Task.RADAR, pose))
         except IndexError:
             pass
 
@@ -244,7 +241,6 @@ class Supervizor:
                     self.feasible_tasks.add(
                         (Robot.Task.ORE, (i, j))
                     )
-        self.feasible_tasks = self.feasible_tasks | self.one_shot_tasks
         print("*****feasible************", file=sys.stderr)
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in self.feasible_tasks]), file=sys.stderr)
 
@@ -274,8 +270,6 @@ class Supervizor:
                 except KeyError:
                     assert len(dispatachable_tasks) == 0
             unit.play(env)
-        # keep only the one shot task that haven't been dispatched
-        self.one_shot_tasks = self.one_shot_tasks & set(dispatachable_tasks)
 
 
 def main():
