@@ -76,7 +76,7 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s %s DIG_ORE' % self.target
-            if (self.x == 0) and (env.radar_cd == 0):
+            if (self.x == 0) and (env.radar_cd == 0) and (self.item == -1):
                 self.action = "REQUEST TRAP REQ_TRAP"
                 env.radar_cd = 5
             else:
