@@ -187,7 +187,10 @@ class Environment:
     def available_ore_count(self):
         # when ally_hole or ally_trap is true oe don't count in the sum
         # the * -1 act as a not()
-        return np.multiply(np.multiply(self.ore, self.ally_hole * -1), self.ally_traps * -1).sum()
+        return np.multiply(
+            np.multiply(self.ore, self.ally_hole * -1),
+            self.ally_traps * -1
+        ).sum()
 
     def surface_coverd_by_radar(self):
         return len(self.ore[self.ore >= 0])
@@ -205,16 +208,14 @@ class Supervizor:
     def create_task(self, env):
         self.feasible_tasks = set()
         # Handle Radar
-        actual_radar_pose = {
+        radar_pose = {
             env.entities[id_radar].get_loc()
             for id_radar in env.radars
         }
-        remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
+        remaining_radar_poses = list(self.desired_radar_poses - radar_pose)
         remaining_radar_poses.sort(reverse=True)
         try:
-            if (env.radar_cd == 0) \
-                and (len(remaining_radar_poses) > 0) \
-                and (env.available_ore_count() < 6):
+            if (env.radar_cd == 0) and (env.available_ore_count() < 1):
                 pose = remaining_radar_poses.pop()
                 self.feasible_tasks.add((Robot.Task.RADAR, pose))
         except IndexError:
@@ -229,6 +230,7 @@ class Supervizor:
                     self.feasible_tasks.add(
                         (Robot.Task.ORE, (i, j))
                     )
+
         print("*****feasible************", file=sys.stderr)
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in self.feasible_tasks]), file=sys.stderr)
 
