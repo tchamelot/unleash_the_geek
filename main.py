@@ -151,7 +151,6 @@ class Environment:
         self.allies = set()
         self.enemies = set()
         self.radars = set()
-        self.traps = set()
 
     def parse(self):
         # Get the score
