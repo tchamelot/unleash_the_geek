@@ -29,15 +29,18 @@ class Entity:
         return self.x, self.y
 
     def dist_with(self, x, y):
-        return abs(self.x-x) + abs(self.y-y)
+        return abs(self.x - x) + abs(self.y - y)
+
 
 def dist(t1, t2):
-        return abs(t1[0]-t2[0]) + abs(t1[1]-t2[0])
+    return abs(t1[0] - t2[0]) + abs(t1[1] - t2[0])
+
 
 class Robot(Entity):
     """
     Entity that will seek for amadeusium
     """
+
     class Task(IntEnum):
         AVAILABLE = 0
         PLACE_RADAR = 1
@@ -60,33 +63,30 @@ class Robot(Entity):
 
     def radar(self, env):
         if self.task == Robot.Task.RADAR:
-            self.action = 'REQUEST RADAR REQRAD'
+            self.action = 'REQUEST RADAR REQ_RADAR'
             if self.item == 2:
                 self.task = Robot.Task.PLACE_RADAR
         if self.task == Robot.Task.PLACE_RADAR:
-            self.action = 'DIG %s %s' % self.target
+            self.action = 'DIG %s %s  DIG_RADAR' % self.target
             if self.item != 2:
                 self.task = Robot.Task.AVAILABLE
-                self.action = 'WAIT'
-
-        self.action += ' RADAR'
+                self.action = 'WAIT WAIT_RADAR'
 
     def ore(self, env):
         if self.task == Robot.Task.ORE:
-            self.action = 'DIG %s %s' % self.target
+            self.action = 'DIG %s %s DIG_ORE' % self.target
             # if (self.item == 3) and (self.dist_with(*self.target)<3):
             #     env.ally_traps[self.target[1], self.target[0]] = True
             if self.item == 4:
                 self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
-            self.action = 'MOVE 0 %s' % self.y
+            self.action = 'MOVE 0 %s MOVE_ORE' % self.y
             if self.dist_with(*self.target) <= 1:
                 env.ally_hole[self.target[1], self.target[0]] = True
             if self.item == -1:
                 self.task = Robot.Task.AVAILABLE
-                self.action = 'WAIT'
+                self.action = 'WAIT WAIT_ORE'
 
-        self.action += ' ORE'
 
     def play(self, env):
         """
@@ -94,7 +94,7 @@ class Robot(Entity):
         """
         if self.task == Robot.Task.AVAILABLE:
             if (self.x == 0) and (env.radar_cd == 0):
-                self.action = "REQUEST TRAP REQTRAP"
+                self.action = "REQUEST TRAP REQ_TRAP"
                 env.radar_cd = 5
             else:
                 self.action = 'WAIT WAIT'
@@ -133,7 +133,7 @@ ENTITY_FACTORY = {
     1: Robot,
     2: Radar,
     3: Trap,
-    }
+}
 
 
 class Environment:
@@ -163,14 +163,14 @@ class Environment:
         for i in range(self.height):
             row = np.vectorize(np.uint8)(
                 input().replace('?', '-1')  # replace ? in the string
-                .split()  # convert to to array
-                )  # convert this to int
+                    .split()  # convert to to array
+            )  # convert this to int
             self.ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
             self.hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
         # Get entities
         self.entity_cnt, self.radar_cd, self.trap_cd = np.vectorize(np.uint8)(
             input().split()
-            )
+        )
         for i in range(self.entity_cnt):
             u_id, unit_type, x, y, item = [int(j) for j in input().split()]
             try:
@@ -246,8 +246,8 @@ class Supervizor:
         for ally in env.allies:
             unit = env.entities[ally]
             dispatachable_tasks = sorted(list(dispatachable_tasks),
-                   key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
-                   else t[1][0])
+                                         key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
+                                         else unit.x, reverse=False)
             if (unit.task != Robot.Task.DEAD) and \
                     (
                             (unit.get_task() not in self.feasible_tasks) or
@@ -267,12 +267,10 @@ class Supervizor:
 
 
 def main():
-
     env = Environment()
     supervizor = Supervizor()
 
     while True:
-
         env.parse()
 
         supervizor.create_task(env)
