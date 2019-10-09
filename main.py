@@ -50,6 +50,7 @@ class Robot(Entity):
         super().__init__(x, y, item)
         self.action = 'WAIT'
         self.task = Robot.Task.AVAILABLE
+        self.assigned_task = Robot.Task.AVAILABLE
         self.target = (0, 0)
 
     def update(self, x, y, item):
@@ -73,15 +74,15 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s %s' % self.target
-            if (self.item == 3) and (self.dist_with(*self.target)<3):
-                env.ally_traps[self.target[1], self.target[0]] = True
+            # if (self.item == 3) and (self.dist_with(*self.target)<3):
+            #     env.ally_traps[self.target[1], self.target[0]] = True
             if self.item == 4:
                 self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s' % self.y
             if self.dist_with(*self.target) <= 1:
                 env.ally_hole[self.target[1], self.target[0]] = True
-            if self.item != 4:
+            if self.item == -1:
                 self.task = Robot.Task.AVAILABLE
                 self.action = 'WAIT'
 
@@ -106,8 +107,12 @@ class Robot(Entity):
 
         print(self.action)
 
-    def get_task(self, task, target):
+    def get_task(self):
+        return self.assigned_task, (self.x, self.y)
+
+    def set_task(self, task, target):
         self.task = task
+        self.assigned_task = task
         self.target = target
 
 
@@ -196,14 +201,15 @@ class Environment:
 
 class Supervizor:
     def __init__(self):
-        self.tasks = deque()
+        self.feasible_tasks = set()
         self.desired_radar_poses = {
             (24, 12), (24, 4), (22, 8),
             (18, 4), (18, 12), (14, 8),
             (9, 4), (9, 12), (5, 8)}
+        self.assigned_tasks = dict()
 
     def create_task(self, env):
-        self.tasks = deque()
+        self.feasible_tasks = set()
         # Handle Radar
         actual_radar_pose = {
             env.entities[id_radar].get_loc()
@@ -214,7 +220,7 @@ class Supervizor:
         try:
             if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.available_ore_count() < 10):
                 pose = remaining_radar_poses.pop()
-                self.tasks.append((Robot.Task.RADAR, pose))
+                self.feasible_tasks.add((Robot.Task.RADAR, pose))
         except IndexError:
             pass
 
@@ -224,25 +230,39 @@ class Supervizor:
                 if ore > 0 and \
                         (not env.hole[j, i] or env.ally_hole[j, i]) and \
                         (not env.ally_traps[j, i]):
-                    self.tasks.extendleft(
-                        [(Robot.Task.ORE, (i, j))] * ore
+                    self.feasible_tasks.add(
+                        (Robot.Task.ORE, (i, j))
                     )
-
-        print(self.tasks, file=sys.stderr)
+        print("*****feasible************", file=sys.stderr)
+        print(self.feasible_tasks, file=sys.stderr)
 
     def assign_tasks(self, env):
+        token_tasks = set([env.entities[x].get_task() for x in env.allies])
+        print("*****token************", file=sys.stderr)
+        print(token_tasks, file=sys.stderr)
+        dispatachable_tasks = self.feasible_tasks - token_tasks
+        print("*****dispatch************", file=sys.stderr)
+        print(dispatachable_tasks, file=sys.stderr)
         for ally in env.allies:
             unit = env.entities[ally]
-            # # + 2* dist(...) is allow to prioritize the task that the robot already have
-            # self.tasks = sorted(self.tasks,
-            #        key=lambda t: unit.dist_with(*t[1]) + 2 * dist(unit.target, t[1]) if (t[0] == Robot.Task.ORE)
-            #        else t[1][0])
-            if (unit.task != Robot.Task.DEAD):
+            dispatachable_tasks = sorted(list(dispatachable_tasks),
+                   key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
+                   else t[1][0])
+            if (unit.task != Robot.Task.DEAD) and \
+                    (
+                            (unit.get_task() not in self.feasible_tasks) or
+                            (unit.get_task()[0] == Robot.Task.RADAR)
+                    ):
                 try:
+                    t = dispatachable_tasks.pop()
+                    self.feasible_tasks.remove(t)
+                    # print("task changed from %s to %s" % (unit.get_task(), t), file=sys.stderr)
                     # Decompose tuple in multiple args
-                    unit.get_task(*self.tasks.pop())
+                    unit.set_task(*t)
                 except IndexError:
                     pass
+                except KeyError:
+                    assert len(dispatachable_tasks) == 0
             unit.play(env)
 
 
