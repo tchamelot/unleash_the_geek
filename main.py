@@ -195,6 +195,10 @@ class Environment:
     def surface_coverd_by_radar(self):
         return len(self.ore[self.ore >= 0])
 
+    def is_trap_free(self, x, y):
+        return ((not self.hole[y][x]) or self.ally_hole[y][x]) and \
+                not self.ally_traps[y][x]
+
 
 class Supervizor:
     def __init__(self):
@@ -224,9 +228,7 @@ class Supervizor:
         # Handle ore
         for i, column in enumerate(env.ore.T):
             for j, ore in enumerate(column):
-                if ore > 0 and \
-                        ((not env.hole[j, i]) or env.ally_hole[j, i]) and \
-                        (not env.ally_traps[j, i]):
+                if ore > 0 and env.is_trap_free(i, j):
                     self.feasible_tasks.add(
                         (Robot.Task.ORE, (i, j))
                     )
