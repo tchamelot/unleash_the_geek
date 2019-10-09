@@ -70,34 +70,35 @@ class Robot(Entity):
             self.action = 'DIG %s %s  DIG_RADAR' % self.target
             if self.item != 2:
                 self.task = Robot.Task.AVAILABLE
+                self.assigned_task = Robot.Task.AVAILABLE
                 self.action = 'WAIT WAIT_RADAR'
 
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s %s DIG_ORE' % self.target
-            # if (self.item == 3) and (self.dist_with(*self.target)<3):
-            #     env.ally_traps[self.target[1], self.target[0]] = True
-            if self.item == 4:
-                self.task = Robot.Task.BASE
+            if (self.x == 0) and (env.radar_cd == 0):
+                self.action = "REQUEST TRAP REQ_TRAP"
+                env.radar_cd = 5
+            else:
+                # if (self.item == 3) and (self.dist_with(*self.target)<3):
+                #     env.ally_traps[self.target[1], self.target[0]] = True
+                if self.item == 4:
+                    self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s MOVE_ORE' % self.y
             if self.dist_with(*self.target) <= 1:
                 env.ally_hole[self.target[1], self.target[0]] = True
             if self.item == -1:
                 self.task = Robot.Task.AVAILABLE
+                self.assigned_task = Robot.Task.AVAILABLE
                 self.action = 'WAIT WAIT_ORE'
-
 
     def play(self, env):
         """
         Output the robot action for the current round
         """
         if self.task == Robot.Task.AVAILABLE:
-            if (self.x == 0) and (env.radar_cd == 0):
-                self.action = "REQUEST TRAP REQ_TRAP"
-                env.radar_cd = 5
-            else:
-                self.action = 'WAIT WAIT'
+            self.action = 'WAIT WAIT'
         elif self.task <= Robot.Task.RADAR:
             self.radar(env)
         elif self.task <= Robot.Task.ORE:
@@ -105,10 +106,15 @@ class Robot(Entity):
         elif self.task == Robot.Task.DEAD:
             self.action = 'WAIT DEAD'
 
+        self.action += "_%i_%i" % self.target
+
         print(self.action)
 
+    def __str__(self):
+        return "robot:\nloc:%i,%i\nstatus:%s task:%s" % (self.x, self.y, self.task.name, self.assigned_task.name)
+
     def get_task(self):
-        return self.assigned_task, (self.x, self.y)
+        return self.assigned_task, (self.target[0], self.target[1])
 
     def set_task(self, task, target):
         self.task = task
@@ -202,10 +208,12 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.feasible_tasks = set()
-        self.desired_radar_poses = {
+        self.one_shot_tasks = set()
+        self.desired_radar_poses = [
             (24, 12), (24, 4), (22, 8),
             (18, 4), (18, 12), (14, 8),
-            (9, 4), (9, 12), (5, 8)}
+            (9, 4), (9, 12), (5, 8)]
+        self.desired_radar_poses.sort(reverse=True)
         self.assigned_tasks = dict()
 
     def create_task(self, env):
@@ -215,12 +223,15 @@ class Supervizor:
             env.entities[id_radar].get_loc()
             for id_radar in env.radars
         }
-        remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
-        remaining_radar_poses.sort(reverse=True)
+        # remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
+        # remaining_radar_poses.sort(reverse=True)
         try:
-            if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.available_ore_count() < 10):
-                pose = remaining_radar_poses.pop()
-                self.feasible_tasks.add((Robot.Task.RADAR, pose))
+            if (env.radar_cd == 0) \
+                and (len(self.one_shot_tasks) == 0) \
+                and (len(self.desired_radar_poses) != 0) \
+                and (env.available_ore_count() < 2):
+                pose = self.desired_radar_poses.pop()
+                self.one_shot_tasks.add((Robot.Task.RADAR, pose))
         except IndexError:
             pass
 
@@ -233,30 +244,29 @@ class Supervizor:
                     self.feasible_tasks.add(
                         (Robot.Task.ORE, (i, j))
                     )
+        self.feasible_tasks = self.feasible_tasks | self.one_shot_tasks
         print("*****feasible************", file=sys.stderr)
-        print(self.feasible_tasks, file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in self.feasible_tasks]), file=sys.stderr)
 
     def assign_tasks(self, env):
         token_tasks = set([env.entities[x].get_task() for x in env.allies])
         print("*****token************", file=sys.stderr)
-        print(token_tasks, file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in token_tasks]), file=sys.stderr)
         dispatachable_tasks = self.feasible_tasks - token_tasks
         print("*****dispatch************", file=sys.stderr)
-        print(dispatachable_tasks, file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in dispatachable_tasks]), file=sys.stderr)
         for ally in env.allies:
             unit = env.entities[ally]
             dispatachable_tasks = sorted(list(dispatachable_tasks),
                                          key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
-                                         else unit.x, reverse=False)
+                                         else unit.x, reverse=True)
             if (unit.task != Robot.Task.DEAD) and \
-                    (
-                            (unit.get_task() not in self.feasible_tasks) or
-                            (unit.get_task()[0] == Robot.Task.RADAR)
-                    ):
+                    (not (unit.get_task() in self.feasible_tasks)) and \
+                    (unit.get_task()[0] != Robot.Task.RADAR):
                 try:
                     t = dispatachable_tasks.pop()
-                    self.feasible_tasks.remove(t)
-                    # print("task changed from %s to %s" % (unit.get_task(), t), file=sys.stderr)
+                    print("%s\ntask change: %s:%s => %s:%s" % (
+                    unit, unit.get_task()[0].name, unit.get_task()[1], t[0].name, t[1]), file=sys.stderr)
                     # Decompose tuple in multiple args
                     unit.set_task(*t)
                 except IndexError:
@@ -264,6 +274,8 @@ class Supervizor:
                 except KeyError:
                     assert len(dispatachable_tasks) == 0
             unit.play(env)
+        # keep only the one shot task that haven't been dispatched
+        self.one_shot_tasks = self.one_shot_tasks & set(dispatachable_tasks)
 
 
 def main():
