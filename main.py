@@ -192,10 +192,12 @@ class Supervizor:
         }
         remaining_radar_poses = list(self.desired_radar_poses - actual_radar_pose)
         remaining_radar_poses.sort(reverse=True)
-        if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.ore_count() < 6):
-            pose = remaining_radar_poses.pop()
-            # for pose in (self.desired_radar_poses - actual_radar_pose):
-            self.tasks.append((Robot.Task.RADAR, pose))
+        try:
+            if (env.radar_cd == 0) and (len(remaining_radar_poses) != 0) and (env.ore_count() < 6):
+                pose = remaining_radar_poses.pop()
+                self.tasks.append((Robot.Task.RADAR, pose))
+        except IndexError:
+            pass
 
         # Handle ore
         for i, column in enumerate(env.ore.T):
@@ -204,8 +206,6 @@ class Supervizor:
                     self.tasks.extendleft(
                         [(Robot.Task.ORE, (i, j))] * ore
                     )
-
-        print(self.tasks, file=sys.stderr)
 
     def assign_tasks(self, env):
         for ally in env.allies:
