@@ -127,7 +127,7 @@ class Robot(Entity):
 
 ENTITY_FACTORY = {
     0: Robot,
-    1: Robot,
+    1: Entity,
     2: Entity,
     3: Entity,
 }
