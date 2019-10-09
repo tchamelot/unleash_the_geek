@@ -125,23 +125,11 @@ class Robot(Entity):
         self.target = target
 
 
-class Radar(Entity):
-    """
-    Entity that shows ore lodesa nd enemy traps
-    """
-
-
-class Trap(Entity):
-    """
-    Entity that shows ore lodesa nd enemy traps
-    """
-
-
 ENTITY_FACTORY = {
     0: Robot,
     1: Robot,
-    2: Radar,
-    3: Trap,
+    2: Entity,
+    3: Entity,
 }
 
 
