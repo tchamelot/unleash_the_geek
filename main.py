@@ -272,7 +272,7 @@ class Supervizor:
         self.feasible_tasks = set()
         # Handle Radar
         radar_pose = {env.entities[id_radar] for id_radar in env.radars}
-        remaining_radar = list(filter(lambda rad: not(env.trap_free[rad.y, rad.x]), self.desired_radar_poses - radar_pose))
+        remaining_radar = list(filter(lambda rad: env.trap_free[rad.y, rad.x], self.desired_radar_poses - radar_pose))
         remaining_radar.sort(key=lambda r: r.x, reverse=True)
         if len(remaining_radar) == 0:
             env.next_radar_pose = None
