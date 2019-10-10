@@ -121,8 +121,8 @@ class Robot(Entity):
         self.assigned_task = Robot.Task.AVAILABLE
         if env.next_radar_pose is not None:
             self.target = Entity(
-                x=env.next_radar_pose.x + np.random.randint(-3, 3),
-                y=env.next_radar_pose.y + np.random.randint(-3, 3),
+                x=min(env.width - 1, env.next_radar_pose.x + np.random.randint(-3, 3)),
+                y=min(env.height - 1, env.next_radar_pose.y + np.random.randint(-3, 3)),
             )
             self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
         else:
@@ -240,6 +240,9 @@ class Environment:
     def surface_coverd_by_radar(self):
         return len(self.ore[self.ore >= 0])
 
+    def unsafe_ore_count(self):
+        return np.multiply(np.logical_and(np.logical_not(self.ally_traps), self.ally_hole), self.ore).sum()
+
     def is_trap_free(self, x, y):
         return self.trap_free[y, x]
 
@@ -247,10 +250,10 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.feasible_tasks = set()
-        self.desired_radar_poses = {Entity(27, 7),
-                                    Entity(23, 11), Entity(23, 3), Entity(22, 7),
-                                    Entity(17, 3), Entity(17, 11), Entity(14, 7),
-                                    Entity(9, 3), Entity(9, 11), Entity(5, 7)}
+        self.desired_radar_poses = {Entity(28, 7),
+                                    Entity(24, 11), Entity(24, 3), Entity(23, 7),
+                                    Entity(18, 3), Entity(18, 11), Entity(15, 7),
+                                    Entity(10, 3), Entity(10, 11), Entity(6, 7)}
         self.assigned_tasks = dict()
 
     def create_task(self, env):
@@ -280,6 +283,7 @@ class Supervizor:
                     )
 
         print("safe_ore_count: %i, next radar pose: %s" % (env.available_ore_count(), env.next_radar_pose), file=sys.stderr)
+        print("unsafe mode %s" % env.unsafe_ore_condition, file=sys.stderr)
         print("*****feasible************", file=sys.stderr)
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in self.feasible_tasks]), file=sys.stderr)
 
