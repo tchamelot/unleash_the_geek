@@ -60,10 +60,12 @@ class Robot(Entity):
         super().update(x, y, item)
         if (x < 0) or (y < 0):
             self.task = Robot.Task.DEAD
+            self.assigned_task = Robot.Task.DEAD
 
     def radar(self, env):
         if self.task == Robot.Task.RADAR:
             self.action = 'REQUEST RADAR REQ_RADAR'
+            env.radar_cd = 5
             if self.item == 2:
                 self.task = Robot.Task.PLACE_RADAR
         if self.task == Robot.Task.PLACE_RADAR:
@@ -76,12 +78,13 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s %s DIG_ORE' % self.target
-            if (self.x == 0) and (env.radar_cd == 0) and (self.item == -1):
+            if (self.x == 0) and (env.trap_cd == 0) and (self.item == -1):
                 self.action = "REQUEST TRAP REQ_TRAP"
-                env.radar_cd = 5
+                env.trap_cd = 5
             else:
                 # if (self.item == 3) and (self.dist_with(*self.target)<3):
                 #     env.ally_traps[self.target[1], self.target[0]] = True
+                #     # self.task = Robot.Task.BASE
                 if self.item == 4:
                     self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
@@ -191,7 +194,7 @@ class Environment:
                 self.radars.add(u_id)
             if unit_type == 3:
                 self.traps.add(u_id)
-                self.ally_traps[y, x] = -1
+                self.ally_traps[y, x] = True
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
@@ -226,7 +229,7 @@ class Supervizor:
         try:
             if (env.radar_cd == 0) \
                 and (len(remaining_radar_poses) > 0) \
-                and (env.available_ore_count() < 1):
+                and (env.available_ore_count() < 6):
                 pose = remaining_radar_poses.pop()
                 self.feasible_tasks.add((Robot.Task.RADAR, pose))
         except IndexError:
@@ -236,7 +239,7 @@ class Supervizor:
         for i, column in enumerate(env.ore.T):
             for j, ore in enumerate(column):
                 if ore > 0 and \
-                        (not env.hole[j, i] or env.ally_hole[j, i]) and \
+                        ((not env.hole[j, i]) or env.ally_hole[j, i]) and \
                         (not env.ally_traps[j, i]):
                     self.feasible_tasks.add(
                         (Robot.Task.ORE, (i, j))
@@ -264,11 +267,11 @@ class Supervizor:
                     print("%s\ntask change: %s:%s => %s:%s" % (
                     unit, unit.get_task()[0].name, unit.get_task()[1], t[0].name, t[1]), file=sys.stderr)
                     # Decompose tuple in multiple args
-                    unit.set_task(*t)
                 except IndexError:
-                    pass
+                    t = (Robot.Task.AVAILABLE, (0, 0))
                 except KeyError:
-                    assert len(dispatachable_tasks) == 0
+                    t = (Robot.Task.AVAILABLE, (0, 0))
+                unit.set_task(*t)
             unit.play(env)
 
 
