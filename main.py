@@ -9,13 +9,31 @@ class Entity:
     Base class for entity on the map
     """
 
-    def __init__(self, x, y, item):
+    def __init__(self, x, y, item=-1):
         """
         Create a new entity at ```x```, ```y``` with ```item```
         """
         self.x = x
         self.y = y
         self.item = item
+
+    def __str__(self):
+        """
+        Print position of the Entity
+        """
+        return '%i %i' % (self.x, self.y)
+
+    def __repr__(self):
+        """
+        Print position of the Entity
+        """
+        return '%i %i' % (self.x, self.y)
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __hash__(self):
+        return hash((self.x, self.y))
 
     def update(self, x, y, item):
         """
@@ -28,8 +46,8 @@ class Entity:
     def get_loc(self):
         return self.x, self.y
 
-    def dist_with(self, x, y):
-        return abs(self.x - x) + abs(self.y - y)
+    def dist_with(self, other):
+        return abs(self.x - other.x) + abs(self.y - other.y)
 
 
 def dist(t1, t2):
@@ -54,7 +72,7 @@ class Robot(Entity):
         self.action = 'WAIT'
         self.task = Robot.Task.AVAILABLE
         self.assigned_task = Robot.Task.AVAILABLE
-        self.target = (0, 0)
+        self.target = Entity(0, 0)
 
     def update(self, x, y, item):
         super().update(x, y, item)
@@ -64,23 +82,22 @@ class Robot(Entity):
 
     def radar(self, env):
         if self.task == Robot.Task.RADAR:
-            self.action = 'REQUEST RADAR REQ_RADAR'
-            env.radar_cd = 5
+            self.action = 'REQUEST RADAR REQ RADAR'
             if self.item == 2:
                 self.task = Robot.Task.PLACE_RADAR
         if self.task == Robot.Task.PLACE_RADAR:
-            self.action = 'DIG %s %s  DIG_RADAR' % self.target
+            self.action = 'DIG %s DIG RADAR' % self.target
             if self.item != 2:
                 self.task = Robot.Task.AVAILABLE
                 self.assigned_task = Robot.Task.AVAILABLE
-                self.action = 'WAIT WAIT_RADAR'
+                self.action = 'WAIT WAIT RADAR'
 
     def ore(self, env):
         if self.task == Robot.Task.ORE:
-            self.action = 'DIG %s %s DIG_ORE' % self.target
-            if (self.x == 0) and (env.trap_cd == 0) and (self.item == -1):
-                self.action = "REQUEST TRAP REQ_TRAP"
-                env.trap_cd = 5
+            self.action = 'DIG %s DIG ORE' % self.target
+            if (self.x == 0) and (env.radar_cd == 0) and (self.item == -1):
+                self.action = "REQUEST TRAP REQ TRAP"
+                env.radar_cd = 5
             else:
                 # if (self.item == 3) and (self.dist_with(*self.target)<3):
                 #     env.ally_traps[self.target[1], self.target[0]] = True
@@ -88,13 +105,13 @@ class Robot(Entity):
                 if self.item == 4:
                     self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
-            self.action = 'MOVE 0 %s MOVE_ORE' % self.y
-            if self.dist_with(*self.target) <= 1:
-                env.ally_hole[self.target[1], self.target[0]] = True
+            self.action = 'MOVE 0 %s MOVE ORE' % self.y
+            if self.dist_with(self.target) <= 1:
+                env.ally_hole[self.target.y, self.target.x] = True
             if self.item == -1:
                 self.task = Robot.Task.AVAILABLE
                 self.assigned_task = Robot.Task.AVAILABLE
-                self.action = 'WAIT WAIT_ORE'
+                self.action = 'WAIT WAIT ORE'
 
     def play(self, env):
         """
@@ -109,7 +126,7 @@ class Robot(Entity):
         elif self.task == Robot.Task.DEAD:
             self.action = 'WAIT DEAD'
 
-        self.action += "_%i_%i" % self.target
+        self.action += " %s" % self.target
 
         print(self.action)
 
@@ -117,7 +134,7 @@ class Robot(Entity):
         return "robot:\nloc:%i,%i\nstatus:%s task:%s" % (self.x, self.y, self.task.name, self.assigned_task.name)
 
     def get_task(self):
-        return self.assigned_task, (self.target[0], self.target[1])
+        return self.assigned_task, self.target
 
     def set_task(self, task, target):
         self.task = task
@@ -204,56 +221,53 @@ class Supervizor:
     def __init__(self):
         self.feasible_tasks = set()
         self.desired_radar_poses = {
-            (24, 12), (24, 4), (22, 8),
-            (18, 4), (18, 12), (14, 8),
-            (9, 4), (9, 12), (5, 8)}
+            Entity(24, 12), Entity(24, 4), Entity(22, 8),
+            Entity(18, 4), Entity(18, 12), Entity(14, 8),
+            Entity(9, 4), Entity(9, 12), Entity(5, 8)}
         self.assigned_tasks = dict()
 
     def create_task(self, env):
         self.feasible_tasks = set()
         # Handle Radar
-        radar_pose = {
-            env.entities[id_radar].get_loc()
-            for id_radar in env.radars
-        }
-        remaining_radar_poses = list(self.desired_radar_poses - radar_pose)
-        remaining_radar_poses.sort(reverse=True)
+        radar_pose = {env.entities[id_radar] for id_radar in env.radars}
+        remaining_radar = list(self.desired_radar_poses - radar_pose)
+        remaining_radar.sort(key=lambda r: r.x, reverse=True)
         try:
-            if (env.radar_cd == 0) and (env.available_ore_count() < 1):
-                pose = remaining_radar_poses.pop()
+            if (env.radar_cd == 0) and (env.available_ore_count() < 6):
+                pose = remaining_radar.pop()
                 self.feasible_tasks.add((Robot.Task.RADAR, pose))
         except IndexError:
             pass
 
         # Handle ore
-        for i, column in enumerate(env.ore.T):
-            for j, ore in enumerate(column):
-                if ore > 0 and env.is_trap_free(i, j):
+        for x, column in enumerate(env.ore.T):
+            for y, ore in enumerate(column):
+                if ore > 0 and env.is_trap_free(x, y):
                     self.feasible_tasks.add(
-                        (Robot.Task.ORE, (i, j))
+                        (Robot.Task.ORE, Entity(x, y))
                     )
 
         print("*****feasible************", file=sys.stderr)
-        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in self.feasible_tasks]), file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in self.feasible_tasks]), file=sys.stderr)
 
     def assign_tasks(self, env):
         taken_tasks = set([env.entities[x].get_task() for x in env.allies])
 
         print("*****taken************", file=sys.stderr)
-        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in taken_tasks]), file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in taken_tasks]), file=sys.stderr)
 
         dispatchable_tasks = self.feasible_tasks - taken_tasks
 
         print("*****dispatch************", file=sys.stderr)
-        print("\n".join(["%s:%i,%i" % (x[0].name, x[1][0], x[1][1]) for x in dispatchable_tasks]), file=sys.stderr)
+        print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in dispatchable_tasks]), file=sys.stderr)
 
         for ally in env.allies:
             unit = env.entities[ally]
 
             dispatchable_tasks = sorted(
                 list(dispatchable_tasks),
-                key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
-                else unit.x + abs(unit.y - t[1][1]), reverse=True
+                key=lambda t: unit.dist_with(t[1]) if (t[0] == Robot.Task.ORE)
+                else unit.x + abs(unit.y - t[1].y), reverse=True
             )
 
             if (unit.task != Robot.Task.DEAD) and \
@@ -268,7 +282,7 @@ class Supervizor:
                         file=sys.stderr)
                     # Decompose tuple in multiple args
                 except LookupError:
-                    t = (Robot.Task.AVAILABLE, (0, 0))
+                    t = (Robot.Task.AVAILABLE, Entity(0, 0))
                 unit.set_task(*t)
             unit.play(env)
 
