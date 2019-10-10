@@ -28,7 +28,7 @@ def test_first_round():
     child.stdin.flush()
     out = child.stdout.readline()
     print(out)
-    assert(out == b'REQUEST RADAR REQ_RADAR_5_8\n')
+    assert(out.startswith(b'REQUEST RADAR'))
     out = child.stdout.readline()
     print(out)
     # assert(out == b'REQUEST TRAP REQ_TRAP_0_0\n')
