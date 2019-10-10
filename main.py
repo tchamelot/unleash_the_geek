@@ -258,7 +258,7 @@ class Supervizor:
             unit = env.entities[ally]
             dispatachable_tasks = sorted(list(dispatachable_tasks),
                                          key=lambda t: unit.dist_with(*t[1]) if (t[0] == Robot.Task.ORE)
-                                         else unit.x, reverse=True)
+                                         else unit.x + abs(unit.y - t[1][1]), reverse=True)
             if (unit.task != Robot.Task.DEAD) and \
                     (not (unit.get_task() in self.feasible_tasks)) and \
                     (unit.get_task()[0] != Robot.Task.RADAR):
