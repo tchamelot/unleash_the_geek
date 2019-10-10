@@ -96,7 +96,10 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s DIG ORE' % self.target
-            if (self.x == 0) and (env.trap_cd == 0) and (self.item == -1):
+            if (self.x == 0) and \
+                    (env.trap_cd == 0) and \
+                    (self.item == -1) and \
+                    (env.ore[self.target.y, self.target.x] == 1):
                 self.action = "REQUEST TRAP REQ TRAP"
                 env.trap_cd = 5
             else:
@@ -109,15 +112,14 @@ class Robot(Entity):
                     self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s MOVE ORE' % self.y
-            if self.dist_with(self.target) <= 1:
-                env.ally_hole[self.target.y, self.target.x] = True
+            env.ally_hole[self.target.y, self.target.x] = True
             if self.item == -1:
                 self.on_available(env)
 
     def on_available(self, env):
         self.task = Robot.Task.AVAILABLE
         self.assigned_task = Robot.Task.AVAILABLE
-        if env.next_radar_pose is not  None:
+        if env.next_radar_pose is not None:
             self.target = Entity(
                 x=env.next_radar_pose.x + np.random.randint(-3, 3),
                 y=env.next_radar_pose.y + np.random.randint(-3, 3),
@@ -181,7 +183,7 @@ class Environment:
         self.hole = np.zeros((self.height, self.width), dtype=np.bool)
         self.ally_hole = np.zeros((self.height, self.width), dtype=np.bool)
         self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
-        self.trap_free_ore = np.zeros((self.height, self.width), dtype=np.bool)
+        self.trap_free = np.zeros((self.height, self.width), dtype=np.bool)
         self.entities = dict()
         self.radar_cd = 0
         self.trap_cd = 0
@@ -219,10 +221,10 @@ class Environment:
                     self.radars.add(u_id)
                 elif unit_type == 3:
                     self.ally_traps[y, x] = True
-        self.trap_free_ore = np.multiply(
-            np.multiply(self.ore, np.add(self.hole * -1 + 1, self.ally_hole) >= 1),
-            self.ally_traps * -1 + 1
-        )
+        self.trap_free = np.logical_and(
+                np.logical_or(np.logical_not(self.hole), self.ally_hole),
+                np.logical_not(self.ally_traps)
+            )
         self.turn += 1
 
     def ore_count(self):
@@ -231,13 +233,13 @@ class Environment:
     def available_ore_count(self):
         # when ally_hole or ally_trap is true oe don't count in the sum
         # the * -1 act as a not()
-        return self.trap_free_ore.sum()
+        return np.multiply(self.ore, self.trap_free).sum()
 
     def surface_coverd_by_radar(self):
         return len(self.ore[self.ore >= 0])
 
     def is_trap_free(self, x, y):
-        return self.trap_free_ore[y, x]
+        return self.trap_free[y, x]
 
 
 class Supervizor:
