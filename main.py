@@ -195,6 +195,7 @@ class Environment:
 
     def parse(self):
         # Get the score
+        self.radars = set()
         self.my_score, self.enemy_score = [int(i) for i in input().split()]
         # Get the map
         for i in range(self.height):
@@ -219,10 +220,10 @@ class Environment:
                     self.allies.add(u_id)
                 elif unit_type == 1:
                     self.enemies.add(u_id)
-                elif unit_type == 2:
-                    self.radars.add(u_id)
                 elif unit_type == 3:
                     self.ally_traps[y, x] = True
+            if unit_type == 2:
+                self.radars.add(u_id)
         self.trap_free = np.logical_and(
                 np.logical_or(np.logical_not(self.hole), self.ally_hole),
                 np.logical_not(self.ally_traps)
