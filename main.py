@@ -110,9 +110,9 @@ class Robot(Entity):
                 #     # self.task = Robot.Task.BASE
                 if self.item == 4:
                     self.task = Robot.Task.BASE
+                    env.ally_hole[self.target.y, self.target.x] = True
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s MOVE ORE' % self.y
-            env.ally_hole[self.target.y, self.target.x] = True
             if self.item == -1:
                 self.on_available(env)
 
@@ -138,6 +138,8 @@ class Robot(Entity):
             self.action = 'DIG %i %i WAIT' % (self.target.x, self.target.y)
             if env.hole[self.target.y, self.target.x] != 0:
                 self.on_available(env)
+            elif self.item == 4:
+                env.ally_hole[self.target.y, self.target.x] = True
         elif self.task <= Robot.Task.RADAR:
             self.radar(env)
         elif self.task <= Robot.Task.ORE:
