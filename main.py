@@ -108,6 +108,11 @@ class Robot(Entity):
                     (env.ore[self.target.y, self.target.x] == 1):
                 self.action = "REQUEST TRAP REQ TRAP"
                 env.trap_cd = 5
+            elif (self.x == 0) and \
+                    (env.radar_cd == 0) and \
+                    (self.item == -1):
+                self.action = "REQUEST RADAR REQ RAD"
+                env.radar_cd = 5
             else:
                 if not (env.is_trap_free(self.target.x, self.target.y) or env.unsafe_ore_condition):
                     self.on_available(env)
