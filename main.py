@@ -14,8 +14,11 @@ class Entity:
         Create a new entity at ```x```, ```y``` with ```item```
         """
         self.x = x
+        self.old_x = x
         self.y = y
+        self.old_y = y
         self.item = item
+        self.old_item = item
 
     def __str__(self):
         """
@@ -39,6 +42,9 @@ class Entity:
         """
         Update an entity without calling the constructor again
         """
+        self.old_x = self.x
+        self.old_y = self.y
+        self.old_item = item
         self.x = x
         self.y = y
         self.item = item
