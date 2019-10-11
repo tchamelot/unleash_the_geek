@@ -82,6 +82,7 @@ class Robot(Entity):
             y=7 + np.random.randint(-2, 2),
         )
         self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
+        self.tid = 0
 
     def update(self, x, y, item):
         super().update(x, y, item)
@@ -114,14 +115,14 @@ class Robot(Entity):
                 self.action = "REQUEST RADAR REQ RAD"
                 env.radar_cd = 5
             else:
-                if not (env.is_trap_free(self.target.x, self.target.y) or env.unsafe_ore_condition):
+                if self.item == 4:
+                    self.task = Robot.Task.BASE
+                    env.ally_hole[self.target.y, self.target.x] = True
+                elif not (env.is_trap_free(self.target.x, self.target.y) or env.unsafe_ore_condition):
                     self.on_available(env)
                 # if (self.item == 3) and (self.dist_with(*self.target)<3):
                 #     env.ally_traps[self.target[1], self.target[0]] = True
                 #     # self.task = Robot.Task.BASE
-                if self.item == 4:
-                    self.task = Robot.Task.BASE
-                    env.ally_hole[self.target.y, self.target.x] = True
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s MOVE ORE' % self.y
             if self.item == -1:
@@ -135,7 +136,8 @@ class Robot(Entity):
                 x=min(env.width - 1, env.next_radar_pose.x + np.random.randint(-3, 3)),
                 y=min(env.height - 1, env.next_radar_pose.y + np.random.randint(-3, 3)),
             )
-            self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
+            if env.trap_free[self.target.y, self.target.x]:
+                self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
         else:
             self.action = "WAIT NO_ACTION"
 
@@ -166,12 +168,13 @@ class Robot(Entity):
         return "robot:\nloc:%i,%i\nstatus:%s task:%s" % (self.x, self.y, self.task.name, self.assigned_task.name)
 
     def get_task(self):
-        return self.assigned_task, self.target
+        return self.assigned_task, self.target, self.tid
 
-    def set_task(self, task, target):
+    def set_task(self, task, target, tid):
         self.task = task
         self.assigned_task = task
         self.target = target
+        self.tid = tid
 
 
 ENTITY_FACTORY = {
@@ -280,19 +283,20 @@ class Supervizor:
         if (env.radar_cd == 0) and (env.available_ore_count() < 10) and (len(remaining_radar) > 0):
             pose = remaining_radar.pop()
             env.next_radar_pose = pose
-            self.feasible_tasks.add((Robot.Task.RADAR, pose))
+            self.feasible_tasks.add((Robot.Task.RADAR, pose, 0))
         # except IndexError:
         #     pass
 
         # Handle ore
         # env.turn > 175 and (env.my_score < env.enemy_score) and
-        env.unsafe_ore_condition = (env.available_ore_count() <= 5) and (env.next_radar_pose is None)
+        env.unsafe_ore_condition = (env.turn > 130) and (env.available_ore_count() <= 10)
         for x, column in enumerate(env.ore.T):
             for y, ore in enumerate(column):
                 if ore > 0 and ((env.is_trap_free(x, y) or env.unsafe_ore_condition)):
-                    self.feasible_tasks.add(
-                        (Robot.Task.ORE, Entity(x, y))
-                    )
+                    for o in range(ore):
+                        self.feasible_tasks.add(
+                                (Robot.Task.ORE, Entity(x, y), o)
+                        )
 
         print("safe_ore_count: %i, next radar pose: %s" % (env.available_ore_count(), env.next_radar_pose), file=sys.stderr)
         print("unsafe mode %s" % env.unsafe_ore_condition, file=sys.stderr)
