@@ -211,6 +211,7 @@ class Environment:
     def parse(self):
         # Get the score
         self.radars = set()
+        current_enemies = set()
         self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
         self.my_score, self.enemy_score = [int(i) for i in input().split()]
         # Get the map
@@ -229,16 +230,24 @@ class Environment:
             u_id, unit_type, x, y, item = [int(j) for j in input().split()]
             try:
                 self.entities[u_id].update(x, y, item)
+                if (unit_type == 0) and (item == 3):
+                    t = self.entities[u_id].target
+                    self.ally_traps[t.y, t.x] = True
             except KeyError:
                 self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item)
                 if unit_type == 0:
                     self.allies.add(u_id)
                 elif unit_type == 1:
-                    self.enemies.add(u_id)
+                    current_enemies.add(u_id)
                 elif unit_type == 3:
                     self.ally_traps[y, x] = True
             if unit_type == 2:
                 self.radars.add(u_id)
+            elif unit_type == 1:
+                current_enemies.add(u_id)
+        for unseen_enemy in self.enemies - current_enemies:
+            self.entities[unseen_enemy].update(-1, -1, -1)
+        self.enemies = current_enemies
         self.known_tiles = self.ore != -1
         self.ore[self.ore <= 0] = 0
         self.trap_free = np.logical_and(
@@ -307,6 +316,7 @@ class Supervizor:
                         )
 
         print("safe_ore_count: %i, surf_cov: %s" % (env.available_ore_count(), env.get_surface_coverd_by_radar()), file=sys.stderr)
+        print("enemies loc: %s" % ([env.entities[en]for en in env.enemies]), file=sys.stderr)
         print("unsafe mode %s" % env.unsafe_ore_condition, file=sys.stderr)
         print("*****feasible************", file=sys.stderr)
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in self.feasible_tasks]), file=sys.stderr)
