@@ -200,6 +200,7 @@ class Environment:
         self.ally_hole = np.zeros((self.height, self.width), dtype=np.bool)
         self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
         self.trap_free = np.zeros((self.height, self.width), dtype=np.bool)
+        self.known_tiles = np.zeros((self.height, self.width), dtype=np.bool)
         self.entities = dict()
         self.radar_cd = 0
         self.trap_cd = 0
@@ -210,6 +211,7 @@ class Environment:
     def parse(self):
         # Get the score
         self.radars = set()
+        self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
         self.my_score, self.enemy_score = [int(i) for i in input().split()]
         # Get the map
         for i in range(self.height):
@@ -220,7 +222,6 @@ class Environment:
             self.ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
             self.hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
         # Get entities
-        self.ore[self.ore <= 0] = 0
         entity_cnt, self.radar_cd, self.trap_cd = np.vectorize(np.uint8)(
             input().split()
         )
@@ -238,6 +239,8 @@ class Environment:
                     self.ally_traps[y, x] = True
             if unit_type == 2:
                 self.radars.add(u_id)
+        self.known_tiles = self.ore != -1
+        self.ore[self.ore <= 0] = 0
         self.trap_free = np.logical_and(
                 np.logical_or(np.logical_not(self.hole), self.ally_hole),
                 np.logical_not(self.ally_traps)
@@ -252,8 +255,8 @@ class Environment:
         # the * -1 act as a not()
         return np.multiply(self.ore, self.trap_free).sum()
 
-    def surface_coverd_by_radar(self):
-        return len(self.ore[self.ore >= 0])
+    def get_surface_coverd_by_radar(self):
+        return np.sum(self.known_tiles)
 
     def unsafe_ore_count(self):
         return np.multiply(np.logical_and(np.logical_not(self.ally_traps), self.ally_hole), self.ore).sum()
@@ -275,7 +278,12 @@ class Supervizor:
         self.feasible_tasks = set()
         # Handle Radar
         radar_pose = {env.entities[id_radar] for id_radar in env.radars}
-        remaining_radar = list(filter(lambda rad: env.trap_free[rad.y, rad.x], self.desired_radar_poses - radar_pose))
+        remaining_radar = list(
+            filter(
+                lambda rad: env.trap_free[rad.y, rad.x] and not env.known_tiles[rad.y, rad.x],
+                self.desired_radar_poses - radar_pose
+            )
+        )
         remaining_radar.sort(key=lambda r: r.x, reverse=True)
         if len(remaining_radar) == 0:
             env.next_radar_pose = None
@@ -289,7 +297,7 @@ class Supervizor:
 
         # Handle ore
         # env.turn > 175 and (env.my_score < env.enemy_score) and
-        env.unsafe_ore_condition = (env.turn > 130) and (env.available_ore_count() <= 10)
+        env.unsafe_ore_condition = (env.turn > 130) and (env.get_surface_coverd_by_radar() >= 430)
         for x, column in enumerate(env.ore.T):
             for y, ore in enumerate(column):
                 if ore > 0 and ((env.is_trap_free(x, y) or env.unsafe_ore_condition)):
@@ -298,7 +306,7 @@ class Supervizor:
                                 (Robot.Task.ORE, Entity(x, y), o)
                         )
 
-        print("safe_ore_count: %i, next radar pose: %s" % (env.available_ore_count(), env.next_radar_pose), file=sys.stderr)
+        print("safe_ore_count: %i, surf_cov: %s" % (env.available_ore_count(), env.get_surface_coverd_by_radar()), file=sys.stderr)
         print("unsafe mode %s" % env.unsafe_ore_condition, file=sys.stderr)
         print("*****feasible************", file=sys.stderr)
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in self.feasible_tasks]), file=sys.stderr)
@@ -320,7 +328,7 @@ class Supervizor:
             dispatchable_tasks = sorted(
                 list(dispatchable_tasks),
                 key=lambda t: unit.dist_with(t[1]) if (t[0] == Robot.Task.ORE)
-                else unit.x + abs(unit.y - t[1].y), reverse=True
+                else unit.x + abs(unit.y - t[1].y), reverse=not(env.unsafe_ore_condition)
             )
 
             if (unit.task != Robot.Task.DEAD) and \
