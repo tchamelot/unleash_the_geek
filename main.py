@@ -52,7 +52,7 @@ class Entity:
         return self.x, self.y
 
     def dist_with(self, other):
-        return abs(self.x - other.x) + abs(self.y - other.y)
+        return int(abs(self.x - other.x)/4 + abs(self.y - other.y)/4)
 
 
 def dist(t1, t2):
@@ -327,6 +327,13 @@ class Supervizor:
         print("*****feasible************", file=sys.stderr)
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in self.feasible_tasks]), file=sys.stderr)
 
+    @staticmethod
+    def score_tasks(t, unit):
+        if t[0] == Robot.Task.ORE:
+            return unit.dist_with(t[1])
+        else:
+            return unit.x + int(abs(unit.y - t[1].y) / 4) - 4 * (unit.item == Item.ORE)
+
     def assign_tasks(self, env):
         taken_tasks = set([env.entities[x].get_task() for x in env.allies])
 
@@ -343,8 +350,7 @@ class Supervizor:
 
             dispatchable_tasks = sorted(
                 list(dispatchable_tasks),
-                key=lambda t: unit.dist_with(t[1]) if (t[0] == Robot.Task.ORE)
-                else unit.x + abs(unit.y - t[1].y), reverse=not(env.unsafe_ore_condition)
+                key=lambda t: Supervizor.score_tasks(t, unit), reverse=not(env.unsafe_ore_condition)
             )
 
             if (unit.task != Robot.Task.DEAD) and \
