@@ -157,8 +157,6 @@ class Robot(Entity):
             self.action = 'DIG %i %i WAIT' % (self.target.x, self.target.y)
             if env.hole[self.target.y, self.target.x] != 0:
                 self.on_available(env)
-            elif self.item == 4:
-                env.ally_hole[self.target.y, self.target.x] = True
         elif self.task <= Robot.Task.RADAR:
             self.radar(env)
         elif self.task <= Robot.Task.ORE:
@@ -202,11 +200,24 @@ class Environment:
         self.unsafe_ore_condition = False
         self.turn = 0
         self.ore = np.zeros((self.height, self.width), dtype=np.int8)
+        self.diggable_ore = np.zeros((self.height, self.width), dtype=np.int8)
         self.hole = np.zeros((self.height, self.width), dtype=np.bool)
-        self.ally_hole = np.zeros((self.height, self.width), dtype=np.bool)
         self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
-        self.trap_free = np.zeros((self.height, self.width), dtype=np.bool)
+        self.enemy_holes = np.zeros((self.height, self.width), dtype=np.bool)
         self.known_tiles = np.zeros((self.height, self.width), dtype=np.bool)
+        self.trap_free = np.zeros((self.height, self.width), dtype=np.bool)
+        self.dig_patch = np.array([[False, True, False],
+                                   [True, True, True],
+                                   [False, True, False]], dtype=np.bool)
+        self.radar_patch = np.array([[False, False, False, False,  True, False, False, False, False],
+       [False, False, False,  True,  True,  True, False, False, False],
+       [False, False,  True,  True,  True,  True,  True, False, False],
+       [False,  True,  True,  True,  True,  True,  True,  True, False],
+       [ True,  True,  True,  True,  True,  True,  True,  True,  True],
+       [False,  True,  True,  True,  True,  True,  True,  True, False],
+       [False, False,  True,  True,  True,  True,  True, False, False],
+       [False, False, False,  True,  True,  True, False, False, False],
+       [False, False, False, False,  True, False, False, False, False]], dtype=bool)
         self.entities = dict()
         self.radar_cd = 0
         self.trap_cd = 0
@@ -215,10 +226,14 @@ class Environment:
         self.radars = set()
 
     def parse(self):
+        # STEP 1: parse all current entities
         # Get the score
-        self.radars = set()
-        current_enemies = set()
-        self.ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
+        self.current_radars = set()
+        self.current_enemies = set()
+        self.current_allies = set()
+        self.current_ally_traps = np.zeros((self.height, self.width), dtype=np.bool)
+        self.current_ore = np.zeros((self.height, self.width), dtype=np.int8)
+        self.current_holes = np.zeros((self.height, self.width), dtype=np.bool)
         self.my_score, self.enemy_score = [int(i) for i in input().split()]
         # Get the map
         for i in range(self.height):
@@ -226,55 +241,109 @@ class Environment:
                 input().replace('?', '-1')  # replace ? in the string
                     .split()  # convert to to array
             )  # convert this to int
-            self.ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
-            self.hole[i, :] = row[1::2]  # 1 over 2 elements starting at 1
+            self.current_ore[i, :] = row[0::2]  # 1 over 2 element starting at 0
+            self.current_holes[i, :] = row[1::2]  # 1 over 2 elements starting at 1
         # Get entities
-        entity_cnt, self.radar_cd, self.trap_cd = np.vectorize(np.uint8)(
+        entity_cnt, self.current_radar_cd, self.current_trap_cd = np.vectorize(np.uint8)(
             input().split()
         )
         for i in range(entity_cnt):
             u_id, unit_type, x, y, item = [int(j) for j in input().split()]
             try:
                 self.entities[u_id].update(x, y, item)
-                if (unit_type == 0) and (item == 3):
-                    t = self.entities[u_id].target
-                    self.ally_traps[t.y, t.x] = True
             except KeyError:
                 self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item)
-                if unit_type == 0:
-                    self.allies.add(u_id)
-                elif unit_type == 1:
-                    current_enemies.add(u_id)
-                elif unit_type == 3:
-                    self.ally_traps[y, x] = True
-            if unit_type == 2:
-                self.radars.add(u_id)
+            if unit_type == 0:
+                self.current_allies.add(u_id)
             elif unit_type == 1:
-                current_enemies.add(u_id)
-        for unseen_enemy in self.enemies - current_enemies:
+                self.current_enemies.add(u_id)
+            elif unit_type == 2:
+                self.current_radars.add(u_id)
+            elif unit_type == 3:
+                self.current_ally_traps[y, x] = True
+        # STEP 2: update game perception using current entities knowledge
+        self.allies = self.current_allies.copy()
+        self.radars = self.current_radars.copy()
+        for unseen_enemy in self.enemies - self.current_enemies:
             self.entities[unseen_enemy].update(-1, -1, -1)
-        self.enemies = current_enemies
-        self.known_tiles = self.ore != -1
+        for unseen_enemy in self.current_enemies & self.enemies:
+            enemy = self.entities[unseen_enemy]
+            if (enemy.x < enemy.old_x) and not(enemy.base):
+                min_y = max(enemy.old_y-1, 0)
+                max_y = min(enemy.old_y+2, self.height)
+                min_x = max(enemy.old_x-1, 0)
+                max_x = min(enemy.old_x+2, self.width)
+                # todo: fix when dig < 1
+                self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
+                    self.enemy_holes[min_y:max_y, min_x:max_x],
+                    np.logical_and(
+                        self.hole[min_y:max_y, min_x:max_x],
+                        self.dig_patch[0:max_y - min_y, 0:max_x - min_x]
+                    )
+                )
+                enemy.base = True
+            elif enemy.x >= enemy.old_x:
+                enemy.base = False
+        self.trap_cd = self.current_trap_cd
+        self.radar_cd = self.current_radar_cd
+        self.enemies = self.current_enemies.copy()
+        self.known_tiles = self.current_ore != -1
+        self.ore = self.current_ore.copy()
         self.ore[self.ore <= 0] = 0
+        self.hole = self.current_holes.copy()
+        self.ally_traps = self.current_ally_traps.copy()
+        self.turn += 1
+        # STEP 3 compute estimation of full state
+        self.refresh_trap_free()
+        # print(np.array(self.trap_free, dtype=np.int8), file=sys.stderr)
+        # print(self.hole², file=sys.stderr)
+        # print(self.known_tiles, file=sys.stderr)
+        # print(self.trap_free, file=sys.stderr)
+        # print(self.ally_traps, file=sys.stderr)
+
+    def refresh_trap_free(self):
         self.trap_free = np.logical_and(
-                np.logical_or(np.logical_not(self.hole), self.ally_hole),
+                np.logical_not(self.enemy_holes),
                 np.logical_not(self.ally_traps)
             )
-        self.turn += 1
+        self.diggable_ore = np.multiply(self.trap_free, self.ore)
+
+    def get_radar(self):
+        self.radar_cd = 5
+
+    def get_trap(self):
+        self.trap_cd = 5
+
+    def dig_ore(self, entity):
+        self.ore[entity.y, entity.x] -= 1
+
+    def put_trap(self, entity):
+        self.ally_traps[entity.y, entity.x] = True
+        self.refresh_trap_free()
+
+    def put_radar(self, entity):
+        self.radars.add(ENTITY_FACTORY[Item.RADAR](entity.x, entity.y))
+        min_y = max(entity.y - 4, 0)
+        max_y = min(entity.y + 5, self.height)
+        min_x = max(entity.x - 4, 0)
+        max_x = min(entity.x + 5, self.width)
+        # todo fix when radar loc < 5
+        self.known_tiles[min_y:max_y, min_x:max_x] = np.logical_or(
+            self.known_tiles[min_y:max_y, min_x:max_x],
+            self.radar_patch[0:max_y - min_y, 0:max_x - min_x]
+        )
+
+    def deposit_ore(self):
+        self.my_score += 1
 
     def ore_count(self):
         return self.ore[self.ore > 0].sum()
 
     def available_ore_count(self):
-        # when ally_hole or ally_trap is true oe don't count in the sum
-        # the * -1 act as a not()
         return np.multiply(self.ore, self.trap_free).sum()
 
     def get_surface_coverd_by_radar(self):
         return np.sum(self.known_tiles)
-
-    def unsafe_ore_count(self):
-        return np.multiply(np.logical_and(np.logical_not(self.ally_traps), self.ally_hole), self.ore).sum()
 
     def is_trap_free(self, x, y):
         return self.trap_free[y, x]
