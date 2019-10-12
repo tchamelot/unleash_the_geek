@@ -128,7 +128,8 @@ class Robot(Entity):
                 if env.ore[self.target.y, self.target.x] <= 0:
                     self.on_available(env)
             else:
-                if not (env.is_trap_free(self.target.x, self.target.y)):
+                if not (env.is_trap_free(self.target.x, self.target.y)) \
+                        or (env.ore[self.target.y, self.target.x] <= 0):
                     self.on_available(env)
             if (self.item == 3) and (self.dist_with(self.target)<3):
                 env.ally_traps[self.target.y, self.target.x] = True
