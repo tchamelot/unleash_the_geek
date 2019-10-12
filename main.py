@@ -46,10 +46,6 @@ class Entity:
         """
         Update an entity without calling the constructor again
         """
-        if x == 0:
-            self.steps_at_0 += 1
-        else:
-            self.steps_at_0 = 0
         self.pose_2step_ago = Entity(self.old_x, self.old_y)
         self.pose_1step_ago = Entity(self.x, self.y)
         self.old_x = self.x
@@ -57,6 +53,10 @@ class Entity:
         self.old_y = self.y
         self.y = y
         self.old_item = item
+        if (self.x == 0) and (self.x == self.old_x) and (self.y == self.old_y):
+            self.steps_at_0 += 1
+        else:
+            self.steps_at_0 = 0
         if item is not None:
             self.item = item
 
@@ -122,19 +122,6 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s DIG ORE' % self.target
-            # if (self.x <= 4) and \
-            #         (env.trap_cd == 0) and \
-            #         (self.item == -1) and \
-            #         (env.ore[self.target.y, self.target.x] == 2) and \
-            #         (env.my_score > env.enemy_score):
-            #     self.action = "REQUEST TRAP REQ TRAP"
-            #     env.trap_cd = 5
-            # # elif (self.x <= 4) and \
-            # #         (env.radar_cd == 0) and \
-            # #         (self.item == -1):
-            # #     self.action = "REQUEST RADAR REQ RAD"
-            # #     env.radar_cd = 5
-            # else:
             if self.item == 4:
                 self.task = Robot.Task.BASE
             elif env.unsafe_ore_condition:
@@ -234,15 +221,6 @@ class Environment:
         self.dig_patch = np.array([[False, True, False],
                                    [True, True, True],
                                    [False, True, False]], dtype=np.bool)
-        self.radar_patch = np.array([[False, False, False, False,  True, False, False, False, False],
-       [False, False, False,  True,  True,  True, False, False, False],
-       [False, False,  True,  True,  True,  True,  True, False, False],
-       [False,  True,  True,  True,  True,  True,  True,  True, False],
-       [ True,  True,  True,  True,  True,  True,  True,  True,  True],
-       [False,  True,  True,  True,  True,  True,  True,  True, False],
-       [False, False,  True,  True,  True,  True,  True, False, False],
-       [False, False, False,  True,  True,  True, False, False, False],
-       [False, False, False, False,  True, False, False, False, False]], dtype=bool)
         self.entities = dict()
         self.radar_cd = 0
         self.trap_cd = 0
@@ -251,7 +229,6 @@ class Environment:
         self.radars = set()
         self.enemy_dig_spots = dict()
         self.enemy_loc = None
-        # self.enemy_radar = set()
 
     def parse(self):
         # STEP 1: parse all current entities
@@ -304,37 +281,14 @@ class Environment:
             if enemy.pose_1step_ago is not None \
                 and (
                     # ((enemy.x <= enemy.old_x) and not (enemy.base)) or
-                    ((enemy.dist_with(enemy.pose_1step_ago) < 1) and (enemy.x >= 2))
+                    ((enemy.dist_with(enemy.pose_1step_ago) == 0) and (enemy.x >= 2))
             ):
-                min_y = max(enemy.old_y-1, 0)
-                max_y = min(enemy.old_y+2, self.height)
-                min_x = max(enemy.old_x-1, 0)
-                max_x = min(enemy.old_x+2, self.width)
+                min_y = max(enemy.y-1, 0)
+                max_y = min(enemy.y+2, self.height)
+                min_x = max(enemy.x-1, 0)
+                max_x = min(enemy.x+2, self.width)
 
                 surrounding_current_holes = self.current_holes[min_y:max_y, min_x:max_x]
-                surrounding_prev_holes = self.hole[min_y:max_y, min_x:max_x]
-                new_holes = np.logical_xor(surrounding_prev_holes, surrounding_current_holes)
-                ore_decreased = self.current_ore[min_y:max_y, min_x:max_x] < self.ore[min_y:max_y, min_x:max_x]
-                # todo: add condition to check if there is no robots around
-                # if np.sum(new_holes) == 1 and (np.sum(ore_decreased) <= 1):
-                #     self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
-                #         self.enemy_holes[min_y:max_y, min_x:max_x],
-                #         new_holes
-                #     )
-                #     # idx = np.where(new_holes)
-                #     # enemy_radar = Entity(idx[1][0] + enemy.old_x - 1, idx[0][0] + enemy.old_y - 1)
-                #     # if (self.ore[enemy_radar.y, enemy_radar.x] == 0) \
-                #     #         and (self.known_tiles[enemy_radar.y, enemy_radar.x]):
-                #     #     self.enemy_radar.add(enemy_radar)
-                #     #     self.put_enemy_radar(enemy_radar)
-                # else:
-                #     if np.sum(ore_decreased) == 1:
-                #         self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
-                #             self.enemy_holes[min_y:max_y, min_x:max_x],
-                #             ore_decreased
-                #         )
-                #     else:
-                # todo: fix when dig < 1
                 if enemy.item == Item.SOMETHING_BAD:
                     self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
                         self.enemy_holes[min_y:max_y, min_x:max_x],
@@ -343,8 +297,8 @@ class Environment:
                             self.dig_patch[0:max_y - min_y, 0:max_x - min_x]
                         )
                     )
-                    print("trigger by: %s" % enemy.uid, file=sys.stderr)
-                self.enemy_dig_spots[seen_enemy] = (enemy.old_x, enemy.old_y)
+                    print("potential trap at : %s" % (enemy), file=sys.stderr)
+                self.enemy_dig_spots[seen_enemy] = (enemy.x, enemy.y)
             elif (enemy.x < enemy.old_x):
                 enemy.item = Item.NONE
             print("seen enemies: %s: %s, %s" % (enemy.uid, enemy,enemy.item), file=sys.stderr)
@@ -352,6 +306,7 @@ class Environment:
             self.enemy_loc = np.mean(list(self.enemy_dig_spots.values()), axis=0)
         except LookupError:
             self.enemy_loc = None
+        # self.ennemi_relou = np.array(self.hole[:, 0], dtype=np.int8).sum() > 3
         self.trap_cd = self.current_trap_cd
         self.radar_cd = self.current_radar_cd
         self.enemies = self.current_enemies.copy()
@@ -364,10 +319,6 @@ class Environment:
         # STEP 3 compute estimation of full state
         self.refresh_trap_free()
         # print(np.array(self.trap_free, dtype=np.int8), file=sys.stderr)
-        # print(self.hole², file=sys.stderr)
-        # print(self.known_tiles, file=sys.stderr)
-        # print(self.trap_free, file=sys.stderr)
-        # print(self.ally_traps, file=sys.stderr)
 
     def refresh_trap_free(self):
         self.trap_free = np.logical_and(
@@ -389,18 +340,6 @@ class Environment:
         self.ally_traps[entity.y, entity.x] = True
         self.refresh_trap_free()
 
-    def put_radar(self, entity):
-        self.radars.add(ENTITY_FACTORY[Item.RADAR](entity.x, entity.y))
-        min_y = max(entity.y - 4, 0)
-        max_y = min(entity.y + 5, self.height)
-        min_x = max(entity.x - 4, 0)
-        max_x = min(entity.x + 5, self.width)
-        # todo fix when radar loc < 5
-        self.known_tiles[min_y:max_y, min_x:max_x] = np.logical_or(
-            self.known_tiles[min_y:max_y, min_x:max_x],
-            self.radar_patch[0:max_y - min_y, 0:max_x - min_x]
-        )
-
     def deposit_ore(self):
         self.my_score += 1
 
@@ -420,9 +359,6 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.feasible_tasks = set()
-        # self.desired_radar_poses = {Entity(4, 4), Entity(7, 10),
-        #                             Entity(12, 5), Entity(16,10), Entity(20, 4),
-        #                             Entity(25, 9), Entity(26, 4), Entity(26, 10)}
         self.desired_radar_poses = {Entity(27, 4), Entity(27, 10),
                                     Entity(24-2, 11), Entity(24-2, 3), Entity(23-2, 7),
                                     Entity(18-2, 3), Entity(18-2, 11), Entity(15-2, 7),
@@ -434,10 +370,7 @@ class Supervizor:
         # Handle Radar
         radar_pose = {env.entities[id_radar] for id_radar in env.radars}
         remaining_radar = list(
-            # filter(
-            #     lambda rad: not env.known_tiles[rad.y, rad.x],
                 self.desired_radar_poses - radar_pose
-            # )
         )
         remaining_radar.sort(key=lambda r: r.x, reverse=True)
         if len(remaining_radar) == 0:
@@ -455,7 +388,6 @@ class Supervizor:
             pass
 
         # Handle ore
-        # env.turn > 175 and (env.my_score < env.enemy_score) and
         env.unsafe_ore_condition = ((env.turn > 190) or (env.next_radar_pose is None))\
                                    and (env.available_ore_count() < 4)
         for x, column in enumerate(env.ore.T):
@@ -475,12 +407,6 @@ class Supervizor:
     @staticmethod
     def score_tasks(t, unit, env):
         if t[0] == Robot.Task.ORE:
-            # if (env.unsafe_ore_condition):
-            #     enemy_loc = np.mean(list(env.enemy_dig_spots.values()), axis=0)
-            #     print("avg enemy spot: %s " % enemy_loc, file=sys.stderr)
-            #     # close to enemy digging spot
-            #     return t[1].dist_with(Entity(*enemy_loc)) + int(abs(t[1].x)/4)
-            # else:
             # time to go + time to dig + time to base
             return unit.dist_with(t[1]) + 1 + int(abs(t[1].x)/4)
         elif t[0] == Robot.Task.RADAR:
