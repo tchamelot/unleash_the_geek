@@ -76,6 +76,7 @@ class Item(IntEnum):
     RADAR = 2
     TRAP = 3
     ORE = 4
+    SOMETHING_BAD = 1000
 
 
 class Robot(Entity):
@@ -102,7 +103,7 @@ class Robot(Entity):
         self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
         self.tid = 0
 
-    def update(self, x, y, item):
+    def update(self, x, y, item=None):
         super().update(x, y, item)
         if (x < 0) or (y < 0):
             self.task = Robot.Task.DEAD
@@ -248,6 +249,9 @@ class Environment:
         self.allies = set()
         self.enemies = set()
         self.radars = set()
+        self.enemy_dig_spots = dict()
+        self.enemy_loc = None
+        # self.enemy_radar = set()
 
     def parse(self):
         # STEP 1: parse all current entities
@@ -274,7 +278,10 @@ class Environment:
         for i in range(entity_cnt):
             u_id, unit_type, x, y, item = [int(j) for j in input().split()]
             try:
-                self.entities[u_id].update(x, y, item)
+                if unit_type != 1:
+                    self.entities[u_id].update(x, y, item)
+                else:
+                    self.entities[u_id].update(x, y)
             except KeyError:
                 self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item, u_id)
             if unit_type == 0:
@@ -289,25 +296,62 @@ class Environment:
         self.allies = self.current_allies.copy()
         self.radars = self.current_radars.copy()
         for unseen_enemy in self.enemies - self.current_enemies:
-            self.entities[unseen_enemy].update(-1, -1, -1)
-        for unseen_enemy in self.current_enemies & self.enemies:
-            enemy = self.entities[unseen_enemy]
-            if (enemy.x < enemy.old_x) and not(enemy.base):
+            self.entities[unseen_enemy].update(-1, -1)
+        for seen_enemy in self.current_enemies & self.enemies:
+            enemy = self.entities[seen_enemy]
+            if (enemy.steps_at_0 > 1):
+                enemy.item = Item.SOMETHING_BAD
+            if enemy.pose_1step_ago is not None \
+                and (
+                    # ((enemy.x <= enemy.old_x) and not (enemy.base)) or
+                    ((enemy.dist_with(enemy.pose_1step_ago) < 1) and (enemy.x >= 2))
+            ):
                 min_y = max(enemy.old_y-1, 0)
                 max_y = min(enemy.old_y+2, self.height)
                 min_x = max(enemy.old_x-1, 0)
                 max_x = min(enemy.old_x+2, self.width)
+
+                surrounding_current_holes = self.current_holes[min_y:max_y, min_x:max_x]
+                surrounding_prev_holes = self.hole[min_y:max_y, min_x:max_x]
+                new_holes = np.logical_xor(surrounding_prev_holes, surrounding_current_holes)
+                ore_decreased = self.current_ore[min_y:max_y, min_x:max_x] < self.ore[min_y:max_y, min_x:max_x]
+                # todo: add condition to check if there is no robots around
+                # if np.sum(new_holes) == 1 and (np.sum(ore_decreased) <= 1):
+                #     self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
+                #         self.enemy_holes[min_y:max_y, min_x:max_x],
+                #         new_holes
+                #     )
+                #     # idx = np.where(new_holes)
+                #     # enemy_radar = Entity(idx[1][0] + enemy.old_x - 1, idx[0][0] + enemy.old_y - 1)
+                #     # if (self.ore[enemy_radar.y, enemy_radar.x] == 0) \
+                #     #         and (self.known_tiles[enemy_radar.y, enemy_radar.x]):
+                #     #     self.enemy_radar.add(enemy_radar)
+                #     #     self.put_enemy_radar(enemy_radar)
+                # else:
+                #     if np.sum(ore_decreased) == 1:
+                #         self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
+                #             self.enemy_holes[min_y:max_y, min_x:max_x],
+                #             ore_decreased
+                #         )
+                #     else:
                 # todo: fix when dig < 1
-                self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
-                    self.enemy_holes[min_y:max_y, min_x:max_x],
-                    np.logical_and(
-                        self.hole[min_y:max_y, min_x:max_x],
-                        self.dig_patch[0:max_y - min_y, 0:max_x - min_x]
+                if enemy.item == Item.SOMETHING_BAD:
+                    self.enemy_holes[min_y:max_y, min_x:max_x] = np.logical_or(
+                        self.enemy_holes[min_y:max_y, min_x:max_x],
+                        np.logical_and(
+                            surrounding_current_holes,
+                            self.dig_patch[0:max_y - min_y, 0:max_x - min_x]
+                        )
                     )
-                )
-                enemy.base = True
-            elif enemy.x > enemy.old_x:
-                enemy.base = False
+                    print("trigger by: %s" % enemy.uid, file=sys.stderr)
+                self.enemy_dig_spots[seen_enemy] = (enemy.old_x, enemy.old_y)
+            elif (enemy.x < enemy.old_x):
+                enemy.item = Item.NONE
+            print("seen enemies: %s: %s, %s" % (enemy.uid, enemy,enemy.item), file=sys.stderr)
+        try:
+            self.enemy_loc = np.mean(list(self.enemy_dig_spots.values()), axis=0)
+        except LookupError:
+            self.enemy_loc = None
         self.trap_cd = self.current_trap_cd
         self.radar_cd = self.current_radar_cd
         self.enemies = self.current_enemies.copy()
