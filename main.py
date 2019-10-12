@@ -1,6 +1,5 @@
 import sys
 from enum import IntEnum
-from collections import deque
 import numpy as np
 
 
@@ -58,6 +57,13 @@ class Entity:
 
 def dist(t1, t2):
     return abs(t1[0] - t2[0]) + abs(t1[1] - t2[0])
+
+
+class Item(IntEnum):
+    NONE = -1
+    RADAR = 2
+    TRAP = 3
+    ORE = 4
 
 
 class Robot(Entity):
