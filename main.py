@@ -419,11 +419,23 @@ class Supervizor:
         print("\n".join(["%s:%i,%i" % (x[0].name, x[1].x, x[1].y) for x in self.feasible_tasks]), file=sys.stderr)
 
     @staticmethod
-    def score_tasks(t, unit):
+    def score_tasks(t, unit, env):
         if t[0] == Robot.Task.ORE:
-            return unit.dist_with(t[1])
+            # if (env.unsafe_ore_condition):
+            #     enemy_loc = np.mean(list(env.enemy_dig_spots.values()), axis=0)
+            #     print("avg enemy spot: %s " % enemy_loc, file=sys.stderr)
+            #     # close to enemy digging spot
+            #     return t[1].dist_with(Entity(*enemy_loc)) + int(abs(t[1].x)/4)
+            # else:
+            # time to go + time to dig + time to base
+            return unit.dist_with(t[1]) + 1 + int(abs(t[1].x)/4)
+        elif t[0] == Robot.Task.RADAR:
+            # to to go back if not carrying ore + time to go radar
+            return (int(unit.x/4) * (unit.item == Item.ORE)) + int((t[1].x + t[1].y) / 4)
         else:
-            return unit.x + int(abs(unit.y - t[1].y) / 4) - 4 * (unit.item == Item.ORE)
+            # not supposed to happend
+            # to to reach target + time to do something
+            return unit.dist_with(t[1]) + 1
 
     def assign_tasks(self, env):
         taken_tasks = set([env.entities[x].get_task() for x in env.allies])
@@ -441,7 +453,7 @@ class Supervizor:
 
             dispatchable_tasks = sorted(
                 list(dispatchable_tasks),
-                key=lambda t: Supervizor.score_tasks(t, unit), reverse=not(env.unsafe_ore_condition)
+                key=lambda t: Supervizor.score_tasks(t, unit, env), reverse=not(env.unsafe_ore_condition)
             )
 
             if (unit.task != Robot.Task.DEAD) and \
