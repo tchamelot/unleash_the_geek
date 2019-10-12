@@ -14,6 +14,9 @@ class Entity:
         """
         self.x = x
         self.old_x = x
+        self.steps_at_0 = 0
+        self.pose_1step_ago = None
+        self.pose_2step_ago = None
         self.y = y
         self.old_y = y
         self.item = item
@@ -39,22 +42,29 @@ class Entity:
     def __hash__(self):
         return hash((self.x, self.y))
 
-    def update(self, x, y, item):
+    def update(self, x, y, item=None):
         """
         Update an entity without calling the constructor again
         """
+        if x == 0:
+            self.steps_at_0 += 1
+        else:
+            self.steps_at_0 = 0
+        self.pose_2step_ago = Entity(self.old_x, self.old_y)
+        self.pose_1step_ago = Entity(self.x, self.y)
         self.old_x = self.x
-        self.old_y = self.y
-        self.old_item = item
         self.x = x
+        self.old_y = self.y
         self.y = y
-        self.item = item
+        self.old_item = item
+        if item is not None:
+            self.item = item
 
     def get_loc(self):
         return self.x, self.y
 
     def dist_with(self, other):
-        return int(abs(self.x - other.x)/4 + abs(self.y - other.y)/4)
+        return (abs(self.x - other.x)/4 + (self.y - other.y)/4)
 
 
 def dist(t1, t2):
