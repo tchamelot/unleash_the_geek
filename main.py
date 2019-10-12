@@ -8,7 +8,7 @@ class Entity:
     Base class for entity on the map
     """
 
-    def __init__(self, x, y, item=-1):
+    def __init__(self, x, y, item=-1, uid=-1):
         """
         Create a new entity at ```x```, ```y``` with ```item```
         """
@@ -18,6 +18,8 @@ class Entity:
         self.old_y = y
         self.item = item
         self.old_item = item
+        self.uid = uid
+        self.base = False
 
     def __str__(self):
         """
@@ -79,8 +81,8 @@ class Robot(Entity):
         ORE = 4
         DEAD = 100
 
-    def __init__(self, x, y, item):
-        super().__init__(x, y, item)
+    def __init__(self, x, y, item, uid):
+        super().__init__(x, y, item, uid)
         self.task = Robot.Task.AVAILABLE
         self.assigned_task = Robot.Task.AVAILABLE
         self.target = Entity(
@@ -258,7 +260,7 @@ class Environment:
             try:
                 self.entities[u_id].update(x, y, item)
             except KeyError:
-                self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item)
+                self.entities[u_id] = ENTITY_FACTORY[unit_type](x, y, item, u_id)
             if unit_type == 0:
                 self.current_allies.add(u_id)
             elif unit_type == 1:
@@ -288,7 +290,7 @@ class Environment:
                     )
                 )
                 enemy.base = True
-            elif enemy.x >= enemy.old_x:
+            elif enemy.x > enemy.old_x:
                 enemy.base = False
         self.trap_cd = self.current_trap_cd
         self.radar_cd = self.current_radar_cd
