@@ -109,26 +109,26 @@ class Robot(Entity):
     def ore(self, env):
         if self.task == Robot.Task.ORE:
             self.action = 'DIG %s DIG ORE' % self.target
-            if (self.x == 0) and \
-                    (env.trap_cd == 0) and \
-                    (self.item == -1) and \
-                    (env.ore[self.target.y, self.target.x] == 1):
-                self.action = "REQUEST TRAP REQ TRAP"
-                env.trap_cd = 5
-            elif (self.x == 0) and \
-                    (env.radar_cd == 0) and \
-                    (self.item == -1):
-                self.action = "REQUEST RADAR REQ RAD"
-                env.radar_cd = 5
-            else:
-                if self.item == 4:
-                    self.task = Robot.Task.BASE
-                    env.ally_hole[self.target.y, self.target.x] = True
-                elif not (env.is_trap_free(self.target.x, self.target.y) or env.unsafe_ore_condition):
-                    self.on_available(env)
-                # if (self.item == 3) and (self.dist_with(*self.target)<3):
-                #     env.ally_traps[self.target[1], self.target[0]] = True
-                #     # self.task = Robot.Task.BASE
+            # if (self.x <= 4) and \
+            #         (env.trap_cd == 0) and \
+            #         (self.item == -1) and \
+            #         (env.ore[self.target.y, self.target.x] == 2) and \
+            #         (env.my_score > env.enemy_score):
+            #     self.action = "REQUEST TRAP REQ TRAP"
+            #     env.trap_cd = 5
+            # # elif (self.x <= 4) and \
+            # #         (env.radar_cd == 0) and \
+            # #         (self.item == -1):
+            # #     self.action = "REQUEST RADAR REQ RAD"
+            # #     env.radar_cd = 5
+            # else:
+            if self.item == 4:
+                self.task = Robot.Task.BASE
+            elif not (env.is_trap_free(self.target.x, self.target.y) or env.unsafe_ore_condition):
+                self.on_available(env)
+            if (self.item == 3) and (self.dist_with(self.target)<3):
+                env.ally_traps[self.target.y, self.target.x] = True
+                # self.task = Robot.Task.BASE
         if self.task == Robot.Task.BASE:
             self.action = 'MOVE 0 %s MOVE ORE' % self.y
             if self.item == -1:
