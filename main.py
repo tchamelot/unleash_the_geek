@@ -142,8 +142,14 @@ class Robot(Entity):
                 x=min(env.width - 1, env.next_radar_pose.x + np.random.randint(-3, 3)),
                 y=min(env.height - 1, env.next_radar_pose.y + np.random.randint(-3, 3)),
             )
-            if env.trap_free[self.target.y, self.target.x]:
-                self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
+            i = 0
+            while not(env.trap_free[self.target.y, self.target.x]) and (i < 10):
+                self.target = Entity(
+                    x=min(env.width - 1, env.next_radar_pose.x + np.random.randint(-3, 3)),
+                    y=min(env.height - 1, env.next_radar_pose.y + np.random.randint(-3, 3)),
+                )
+                i += 1
+            self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
         else:
             self.action = "WAIT NO_ACTION"
 
