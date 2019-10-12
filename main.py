@@ -145,7 +145,9 @@ class Robot(Entity):
                 y=min(env.height - 1, env.next_radar_pose.y + np.random.randint(-3, 3)),
             )
             i = 0
-            while not(env.trap_free[self.target.y, self.target.x]) and (i < 10):
+            while not(env.trap_free[self.target.y, self.target.x]) \
+                    and (not env.known_tiles[self.target.y, self.target.x]) \
+                    and (i < 10):
                 self.target = Entity(
                     x=min(env.width - 1, env.next_radar_pose.x + np.random.randint(-3, 3)),
                     y=min(env.height - 1, env.next_radar_pose.y + np.random.randint(-3, 3)),
