@@ -319,7 +319,8 @@ class Supervizor:
 
         # Handle ore
         # env.turn > 175 and (env.my_score < env.enemy_score) and
-        env.unsafe_ore_condition = (env.turn > 130) and (env.get_surface_coverd_by_radar() >= 430)
+        env.unsafe_ore_condition = ((env.turn > 190) or (env.next_radar_pose is None))\
+                                   and (env.available_ore_count() < 4)
         for x, column in enumerate(env.ore.T):
             for y, ore in enumerate(column):
                 if ore > 0 and ((env.is_trap_free(x, y) or env.unsafe_ore_condition)):
