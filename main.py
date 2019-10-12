@@ -126,8 +126,12 @@ class Robot(Entity):
             # else:
             if self.item == 4:
                 self.task = Robot.Task.BASE
-            elif not (env.is_trap_free(self.target.x, self.target.y) or env.unsafe_ore_condition):
-                self.on_available(env)
+            elif env.unsafe_ore_condition:
+                if env.ore[self.target.y, self.target.x] <= 0:
+                    self.on_available(env)
+            else:
+                if not (env.is_trap_free(self.target.x, self.target.y)):
+                    self.on_available(env)
             if (self.item == 3) and (self.dist_with(self.target)<3):
                 env.ally_traps[self.target.y, self.target.x] = True
                 # self.task = Robot.Task.BASE
