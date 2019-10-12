@@ -302,8 +302,8 @@ class Environment:
         self.radar_cd = self.current_radar_cd
         self.enemies = self.current_enemies.copy()
         self.known_tiles = self.current_ore != -1
+        self.current_ore[self.current_ore <= 0] = 0
         self.ore = self.current_ore.copy()
-        self.ore[self.ore <= 0] = 0
         self.hole = self.current_holes.copy()
         self.ally_traps = self.current_ally_traps.copy()
         self.turn += 1
