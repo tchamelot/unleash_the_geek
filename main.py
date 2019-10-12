@@ -276,7 +276,8 @@ class Environment:
             self.entities[unseen_enemy].update(-1, -1)
         for seen_enemy in self.current_enemies & self.enemies:
             enemy = self.entities[seen_enemy]
-            if (enemy.steps_at_0 > 1):
+            if (enemy.steps_at_0 >= 1) and (self.turn != 1):
+                print("id: %i stepsat0: %i dist: %f" % (enemy.uid, enemy.steps_at_0, enemy.dist_with(enemy.pose_2step_ago)), file=sys.stderr)
                 enemy.item = Item.SOMETHING_BAD
             if enemy.pose_1step_ago is not None \
                 and (
