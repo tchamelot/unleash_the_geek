@@ -283,9 +283,12 @@ class Environment:
 class Supervizor:
     def __init__(self):
         self.feasible_tasks = set()
-        self.desired_radar_poses = {Entity(28, 7),
-                                    Entity(24, 11), Entity(24, 3), Entity(23, 7),
-                                    Entity(18, 3), Entity(18, 11), Entity(15, 7),
+        # self.desired_radar_poses = {Entity(4, 4), Entity(7, 10),
+        #                             Entity(12, 5), Entity(16,10), Entity(20, 4),
+        #                             Entity(25, 9), Entity(26, 4), Entity(26, 10)}
+        self.desired_radar_poses = {Entity(27, 4), Entity(27, 10),
+                                    Entity(24-2, 11), Entity(24-2, 3), Entity(23-2, 7),
+                                    Entity(18-2, 3), Entity(18-2, 11), Entity(15-2, 7),
                                     Entity(10, 3), Entity(10, 11), Entity(6, 7)}
         self.assigned_tasks = dict()
 
@@ -294,21 +297,25 @@ class Supervizor:
         # Handle Radar
         radar_pose = {env.entities[id_radar] for id_radar in env.radars}
         remaining_radar = list(
-            filter(
-                lambda rad: env.trap_free[rad.y, rad.x] and not env.known_tiles[rad.y, rad.x],
+            # filter(
+            #     lambda rad: not env.known_tiles[rad.y, rad.x],
                 self.desired_radar_poses - radar_pose
-            )
+            # )
         )
         remaining_radar.sort(key=lambda r: r.x, reverse=True)
         if len(remaining_radar) == 0:
             env.next_radar_pose = None
-        # try:
-        if (env.radar_cd == 0) and (env.available_ore_count() < 10) and (len(remaining_radar) > 0):
-            pose = remaining_radar.pop()
-            env.next_radar_pose = pose
-            self.feasible_tasks.add((Robot.Task.RADAR, pose, 0))
-        # except IndexError:
-        #     pass
+        try:
+            if (env.radar_cd == 0) and (env.available_ore_count() < 12) and (len(remaining_radar) > 0):
+                pose = remaining_radar.pop()
+                if not(env.trap_free[pose.y, pose.x]):
+                    self.desired_radar_poses.remove(pose)
+                    pose.x += 1
+                    self.desired_radar_poses.add(pose)
+                env.next_radar_pose = pose
+                self.feasible_tasks.add((Robot.Task.RADAR, pose, 0))
+        except IndexError:
+            pass
 
         # Handle ore
         # env.turn > 175 and (env.my_score < env.enemy_score) and
