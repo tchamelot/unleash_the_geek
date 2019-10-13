@@ -64,7 +64,10 @@ class Entity:
         return self.x, self.y
 
     def dist_with(self, other):
-        return (abs(self.x - other.x)/4 + (self.y - other.y)/4)
+        return (int(abs(self.x - other.x)) + int(abs(self.y - other.y))) * 0.25
+
+    def can_interact(self, other):
+        return (int(abs(self.x - other.x)) + int(abs(self.y - other.y))) <= 1
 
 
 def dist(t1, t2):
