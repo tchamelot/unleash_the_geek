@@ -122,8 +122,12 @@ class Robot(Entity):
 
     def radar(self, env):
         if self.task == Robot.Task.RADAR:
+            # take the token
+            env.radar_token = False
             self.action = 'REQUEST RADAR REQ RADAR'
             if self.item == 2:
+                # give the token back
+                env.radar_token = True
                 self.task = Robot.Task.PLACE_RADAR
         if self.task == Robot.Task.PLACE_RADAR:
             self.action = 'DIG %s DIG RADAR' % self.target
@@ -260,6 +264,7 @@ class Environment:
         self.radars = set()
         self.enemy_dig_spots = dict()
         self.enemy_loc = None
+        self.radar_token = True
 
     def parse(self):
         # STEP 1: parse all current entities
@@ -408,7 +413,9 @@ class Supervizor:
         if len(remaining_radar) == 0:
             env.next_radar_pose = None
         try:
-            if (env.available_ore_count() < 16) and (len(remaining_radar) > 0):
+            if env.radar_cd == 0:
+                env.radar_token = True
+            if env.radar_token and (env.available_ore_count() < 12) and (len(remaining_radar) > 0):
                 pose = remaining_radar.pop()
                 if not(env.trap_free[pose.y, pose.x]):
                     self.desired_radar_poses.remove(pose)
