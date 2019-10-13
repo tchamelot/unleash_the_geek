@@ -39,6 +39,9 @@ class Entity:
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
+    def __add__(self, other):
+        return Entity(self.x + other.x, self.y + other.y)
+
     def __hash__(self):
         return hash((self.x, self.y))
 
@@ -95,6 +98,11 @@ class Robot(Entity):
         ORE = 4
         DEAD = 100
 
+    surroundings = [
+        Entity(0, 0), Entity(1, 0), Entity(-1, 0),
+        Entity(0, 1), Entity(0, -1)
+    ]
+
     def __init__(self, x, y, item, uid):
         super().__init__(x, y, item, uid)
         self.task = Robot.Task.AVAILABLE
@@ -123,24 +131,41 @@ class Robot(Entity):
                 self.on_available(env)
 
     def ore(self, env):
-        if self.task == Robot.Task.ORE:
-            self.action = 'DIG %s DIG ORE' % self.target
-            if self.item == 4:
-                self.task = Robot.Task.BASE
-            elif env.unsafe_ore_condition:
-                if env.ore[self.target.y, self.target.x] <= 0:
+        override_action = False
+        enemies_loc = [env.entities[enemy] for enemy in env.enemies]
+        allies_loc = [env.entities[ally] for ally in env.allies]
+        for rob_surrounding in self.surroundings:
+            # check dangerous action to do
+            position = self + rob_surrounding
+            if (env.width > position.x >= 0) and (env.height > position.y >= 0) and \
+                    not(env.trap_free[position.y, position.x]):
+                # there is a dangerous action to do
+                # count surrounding robots
+                enemies_count = np.sum([position.dist_with(en) <= 0.25 for en in enemies_loc])
+                ally_count = np.sum([position.dist_with(al) < 1 for al in allies_loc])
+                if enemies_count > ally_count:
+                    self.action = 'DIG %i %i' % (position.x, position.y)
+                    print("action override: %s, en: %i al: %i" % (position, enemies_count, ally_count), file=sys.stderr)
+                    override_action = True
+        if not override_action:
+            if self.task == Robot.Task.ORE:
+                self.action = 'DIG %s DIG ORE' % self.target
+                if self.item == 4:
+                    self.task = Robot.Task.BASE
+                elif env.unsafe_ore_condition:
+                    if env.ore[self.target.y, self.target.x] <= 0:
+                        self.on_available(env)
+                else:
+                    if not (env.is_trap_free(self.target.x, self.target.y)) \
+                            or (env.ore[self.target.y, self.target.x] <= 0):
+                        self.on_available(env)
+                if (self.item == 3) and (self.dist_with(self.target) < 3):
+                    env.ally_traps[self.target.y, self.target.x] = True
+                    # self.task = Robot.Task.BASE
+            if self.task == Robot.Task.BASE:
+                self.action = 'MOVE 0 %s MOVE ORE' % self.y
+                if self.item == -1:
                     self.on_available(env)
-            else:
-                if not (env.is_trap_free(self.target.x, self.target.y)) \
-                        or (env.ore[self.target.y, self.target.x] <= 0):
-                    self.on_available(env)
-            if (self.item == 3) and (self.dist_with(self.target)<3):
-                env.ally_traps[self.target.y, self.target.x] = True
-                # self.task = Robot.Task.BASE
-        if self.task == Robot.Task.BASE:
-            self.action = 'MOVE 0 %s MOVE ORE' % self.y
-            if self.item == -1:
-                self.on_available(env)
 
     def on_available(self, env):
         self.task = Robot.Task.AVAILABLE
@@ -169,6 +194,8 @@ class Robot(Entity):
         """
         if self.item == 4:
             self.task = Robot.Task.ORE
+        if self.item == 2:
+            self.task = Robot.Task.PLACE_RADAR
         if self.task == Robot.Task.AVAILABLE:
             self.action = 'DIG %i %i WAIT' % (self.target.x, self.target.y)
             if env.hole[self.target.y, self.target.x] != 0:
