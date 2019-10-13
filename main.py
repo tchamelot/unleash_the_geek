@@ -108,8 +108,8 @@ class Robot(Entity):
         self.task = Robot.Task.AVAILABLE
         self.assigned_task = Robot.Task.AVAILABLE
         self.target = Entity(
-            x=5 + np.random.randint(-2, 2),
-            y=7 + np.random.randint(-2, 2),
+            x=3,
+            y=y + np.sign(7 - x),
         )
         self.action = 'DIG %i %i AVAIL_DIG' % (self.target.x, self.target.y)
         self.tid = 0
