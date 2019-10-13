@@ -408,7 +408,7 @@ class Supervizor:
         if len(remaining_radar) == 0:
             env.next_radar_pose = None
         try:
-            if (env.radar_cd == 0) and (env.available_ore_count() < 12) and (len(remaining_radar) > 0):
+            if (env.available_ore_count() < 16) and (len(remaining_radar) > 0):
                 pose = remaining_radar.pop()
                 if not(env.trap_free[pose.y, pose.x]):
                     self.desired_radar_poses.remove(pose)
@@ -416,7 +416,7 @@ class Supervizor:
                     self.desired_radar_poses.add(pose)
                 env.next_radar_pose = pose
                 self.feasible_tasks.add((Robot.Task.RADAR, pose, 0))
-        except IndexError:
+        except LookupError:
             pass
 
         # Handle ore
@@ -442,8 +442,8 @@ class Supervizor:
             # time to go + time to dig + time to base
             return unit.dist_with(t[1]) + 1 + int(abs(t[1].x)/4)
         elif t[0] == Robot.Task.RADAR:
-            # to to go back if not carrying ore + time to go radar
-            return (int(unit.x/4) * (unit.item == Item.ORE)) + int((t[1].x + t[1].y) / 4)
+            # to to go back if not carrying ore + time to wait for cd + time to go radar
+            return max((int(unit.x/4) * (unit.item == Item.ORE)), env.radar_cd) + int((t[1].x + t[1].y) / 4)
         else:
             # not supposed to happend
             # to to reach target + time to do something
